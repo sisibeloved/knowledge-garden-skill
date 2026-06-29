@@ -17,7 +17,7 @@
 
 ## 当前状态
 
-设计已确认,一期 MVP 已实现(28 tests pass)。
+设计已确认,一期 MVP 已实现(**44 tests pass**,含 `garden init` 自动化引导)。
 
 ## 仓库结构
 
@@ -35,9 +35,13 @@ knowledge-garden-skill/
 │   ├── audit.py              只读审计(孤岛/过时/Inbox)
 │   ├── proposal.py           提案生成 + Notion 失败降级暂存
 │   ├── apply.py              轮询 approved → apply + commit + 回写
-│   └── cli_entry.py          CLI 入口(weekly-audit/apply-approved/triage-inbox)
+│   ├── init_vault.py         vault 骨架初始化(幂等)
+│   ├── init_notion.py        Notion 4 库 schema + 自动创建
+│   ├── init_plugins.py       Obsidian 插件启用清单 + 安装指引
+│   ├── init_orchestrator.py  init 编排(checkpoint 续跑 + OAuth 断点)
+│   └── cli_entry.py          CLI 入口(init/weekly-audit/apply-approved/triage-inbox)
 ├── templates/                Obsidian vault 模板
-├── tests/                    28 tests,全 pass
+├── tests/                    44 tests,全 pass
 └── docs/
     ├── knowledge-garden-design.md       完整设计方案
     └── superpowers/plans/               实现计划
@@ -47,6 +51,12 @@ knowledge-garden-skill/
 
 ```bash
 pip install -e . pytest pyyaml httpx
+
+# 首次引导(自动建 vault + Notion 库 + 插件清单,OAuth 是唯一人工断点)
+garden init --vault ./Garden --mcp-endpoint <endpoint> --parent-page <notion-page-id>
+# OAuth 完成后续跑
+garden init --vault ./Garden --mcp-endpoint <endpoint> --parent-page <notion-page-id> --oauth-done
+
 # 审计(在 vault 根目录)
 garden --config _Config/gardener.config.yaml --vault . weekly-audit
 # 应用已批准提案
