@@ -1,0 +1,46 @@
+version: 0.1
+
+risk_levels:
+  L0: {auto: true,  needs_review: false, confirm: false}
+  L1: {auto: true,  needs_review: false, confirm: false, log: commit}
+  L2: {auto: false, needs_review: true,  confirm: once,  log: commit+notion}
+  L3: {auto: false, needs_review: true,  confirm: twice, log: commit+notion}
+
+operations:
+  append_raw:           L0
+  append_draft:         L0
+  generate_report:      L0
+  create_proposal:      L0
+  backfill_frontmatter: L1
+  add_wikilink:         L1
+  add_tag:              L1
+  create_evergreen:     L2
+  update_conclusion:    L2
+  merge_notes:          L2
+  rename_evergreen:     L3
+  move_evergreen:       L3
+  delete_evergreen:     L3
+
+actors:
+  manual_session: [L0, L1, L2, L3]
+  scheduled_run:  [L0, L1]
+
+hard_disabled:
+  - unsanctioned: create_evergreen
+  - any: notion_delete
+  - any: overwrite_without_backup
+
+thresholds:
+  orphan_age_days: 7
+  stale_review_days: 90
+  confidence_min: 0.6
+  batch_l1_max: 50
+
+access:
+  preferred: cli
+  fallback: filesystem
+
+notion:
+  proposal_database_id: "<填待审核提案库 id>"
+  projects_database_id: "<填 Projects 库 id>"
+  mcp_endpoint: "<填 Notion MCP endpoint>"
