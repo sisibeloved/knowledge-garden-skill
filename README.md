@@ -17,4 +17,40 @@
 
 ## 当前状态
 
-设计已确认,待审阅。审阅通过后进入实现计划阶段。
+设计已确认,一期 MVP 已实现(28 tests pass)。
+
+## 仓库结构
+
+```
+knowledge-garden-skill/
+├── SKILL.md                  Agent 入口说明(各入口动词怎么调)
+├── pyproject.toml
+├── garden_gardener/          园丁 plugin 主体(Python)
+│   ├── config.py             加载/校验 gardener.config.yaml
+│   ├── risk.py               风险分级判定(WHO×WHAT 安全闸)
+│   ├── frontmatter.py        YAML frontmatter 解析
+│   ├── vault.py              vault 访问抽象层(CLI 优先 + filesystem 降级)
+│   ├── gitutil.py            git 操作封装(带 gardener 前缀 + notion-id)
+│   ├── notion.py             Notion MCP 客户端封装
+│   ├── audit.py              只读审计(孤岛/过时/Inbox)
+│   ├── proposal.py           提案生成 + Notion 失败降级暂存
+│   ├── apply.py              轮询 approved → apply + commit + 回写
+│   └── cli_entry.py          CLI 入口(weekly-audit/apply-approved/triage-inbox)
+├── templates/                Obsidian vault 模板
+├── tests/                    28 tests,全 pass
+└── docs/
+    ├── knowledge-garden-design.md       完整设计方案
+    └── superpowers/plans/               实现计划
+```
+
+## 运行
+
+```bash
+pip install -e . pytest pyyaml httpx
+# 审计(在 vault 根目录)
+garden --config _Config/gardener.config.yaml --vault . weekly-audit
+# 应用已批准提案
+garden --config _Config/gardener.config.yaml --vault . apply-approved
+```
+
+测试:`python -m pytest -v`
