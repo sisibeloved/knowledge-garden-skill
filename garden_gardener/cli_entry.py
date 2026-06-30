@@ -10,6 +10,7 @@ from .audit import audit
 from .proposal import emit_proposals
 from .apply import apply_approved
 from .init_orchestrator import run_init, COMPLETED, NEEDS_OAUTH
+from .init_notion import NotionBootstrapError
 from .init_plugins import install_instructions
 
 
@@ -18,16 +19,26 @@ def _cmd_init(args) -> int:
 
     OAuth 是唯一人工断点:首次跑返回 NEEDS_OAUTH(exit 3),打印指引;
     用户完成 Notion OAuth 授权后,带 --oauth-done 重跑即可续。
+    Notion 不可达时返回 exit 4 + 友好消息(不抛栈),checkpoint 保留可续跑。
     """
     client = NotionClient(args.mcp_endpoint, "pending", "pending")
-    result = run_init(
-        vault_root=Path(args.vault),
-        config_path=Path(args.config),
-        checkpoint=Path(args.vault) / ".garden-init.json",
-        client=client,
-        parent_page_id=args.parent_page,
-        oauth_already_done=args.oauth_done,
-    )
+    try:
+        result = run_init(
+            vault_root=Path(args.vault),
+            config_path=Path(args.config),
+            checkpoint=Path(args.vault) / ".garden-init.json",
+            client=client,
+            parent_page_id=args.parent_page,
+            oauth_already_done=args.oauth_done,
+        )
+    except NotionBootstrapError as e:
+        print("=" * 60, file=sys.stderr)
+        print("Notion 连接失败,无法建库。", file=sys.stderr)
+        print(f"原因:{e}", file=sys.stderr)
+        print("已完成的步骤已保存,修复后重新运行同样的命令即可续跑(不会重头)。", file=sys.stderr)
+        print("常见原因:endpoint 错误、OAuth 未真正完成、网络不通。", file=sys.stderr)
+        print("=" * 60, file=sys.stderr)
+        return 4
     if result == NEEDS_OAUTH:
         print("=" * 60)
         print("需要完成 Notion OAuth 授权(唯一人工步骤):")
@@ -58,6 +69,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("triage-inbox")
 
     init_p = sub.add_parser("init", help="引导知识花园(vault+Notion+插件清单)")
+    # init 有独立的 --vault/--config(init 是创建 config,不读取),故在此子命令重新声明
+    init_p.add_argument("--vault", default=".",
+                        help="vault 根目录(init 会在此建骨架+config)")
+    init_p.add_argument("--config", default="_Config/gardener.config.yaml",
+                        help="config 输出路径")
     init_p.add_argument("--mcp-endpoint", required=True,
                         help="Notion MCP endpoint")
     init_p.add_argument("--parent-page", required=True,
