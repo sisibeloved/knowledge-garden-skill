@@ -45,3 +45,13 @@ garden --config <vault>/_Config/gardener.config.yaml --vault <vault> --actor sch
 
 ## 授权模型
 见 `gardener.config.yaml` 的 operations/actors/hard_disabled。风险档 L0-L3,详见 `docs/knowledge-garden-design.md` §4。
+
+## 在不同 Agent 宿主里怎么调
+
+本 plugin 是标准 CLI(`garden`),不是任何 Agent 的私有插件。各宿主只是换触发入口:
+- **Claude Code**:把本 `SKILL.md` 放进 `<vault>/.claude/commands/`,或直接让 Claude 跑 `garden` 命令
+- **Codex**:用 `codex exec "在 <vault> 跑 garden weekly-audit" --cd <vault>`,或 Codex app Automations 定时
+- **Hermes / OpenClaw**:用内置 cron scheduler,job 的 prompt 让 agent 调 `garden`
+- 其它能调 shell 的宿主:直接 `garden <verb> ...`
+
+**详细步骤见 `docs/agent-adapters.md`。** 定时/无人值守场景必须加 `--actor scheduled_run`。

@@ -7,13 +7,27 @@
 | 文件 | 说明 |
 |---|---|
 | `docs/knowledge-garden-design.md` | 完整设计方案(6 章 + 附录) |
+| `docs/agent-adapters.md` | **各 Agent 宿主(Claude Code/Codex/Hermes/OpenClaw)接入步骤** |
 
 ## 架构一句话
 
 - **Obsidian** = 知识真相源(可 Git、可迁移、双链图谱)
 - **Notion** = 执行跟踪 + 人机交互(移动端审批/提醒/周报)
-- **园丁 Plugin** = 多 Agent 兼容的复合 plugin,只读审计 + 生成提案 + 应用已授权写,不含调度器
+- **园丁 Plugin** = 标准 CLI(`garden`),所有能调 shell 的 Agent 宿主都能用;不含调度器
 - **授权模型** = 分级信任(L0/L1 自动,L2/L3 在 Notion 审批),所有 Evergreen 写入可追溯
+
+## 在哪个 Agent 里用?
+
+`garden` 是标准 CLI,不是任何 Agent 的私有插件格式。各宿主只是"换个触发 `garden` 命令的入口":
+
+| 宿主 | 调用 | 定时 |
+|---|---|---|
+| Claude Code | `SKILL.md` + 直接命令 | 手动/外部 cron |
+| Codex | `codex exec` | app Automations |
+| Hermes/OpenClaw | cron job 的 prompt | 内置 cron scheduler |
+| Cursor | MCP/rules | 外部 cron |
+
+**详细接入步骤见 [`docs/agent-adapters.md`](docs/agent-adapters.md)**。
 
 ## 当前状态
 
