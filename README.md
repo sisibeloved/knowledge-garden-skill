@@ -1,80 +1,136 @@
-# knowledge-garden-skill
+# 🌿 知识花园园丁
 
-知识花园系统的设计仓库。核心理念:**Agent 当"园丁",不当作者**——Agent 负责搜、整理、补链接、生成草稿、发现孤岛与矛盾;真正进入长期知识库的结论必须经人确认。
+[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
+[![Codex](https://img.shields.io/badge/Codex-plugin-0A7EA4.svg)](#codex-cli)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#claude-code插件市场)
+[![Tests](https://img.shields.io/badge/tests-46%20pass-success.svg)](#测试)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## 仓库内容
+面向个人工作流的知识花园复合技能插件,以 Claude Code / Codex 插件形式交付。核心理念:**Agent 当园丁,不当作者**——负责搜、整理、补链接、生成草稿、发现孤岛与矛盾;真正进入长期知识库的结论必须经人在 Notion 移动端审批。
 
-| 文件 | 说明 |
-|---|---|
-| `docs/knowledge-garden-design.md` | 完整设计方案(6 章 + 附录) |
-| `docs/agent-adapters.md` | **各 Agent 宿主(Claude Code/Codex/Hermes/OpenClaw)接入步骤** |
+---
 
-## 架构一句话
+## 🎯 核心理念
 
-- **Obsidian** = 知识真相源(可 Git、可迁移、双链图谱)
-- **Notion** = 执行跟踪 + 人机交互(移动端审批/提醒/周报)
-- **园丁 Plugin** = 标准 CLI(`garden`),所有能调 shell 的 Agent 宿主都能用;不含调度器
-- **授权模型** = 分级信任(L0/L1 自动,L2/L3 在 Notion 审批),所有 Evergreen 写入可追溯
-
-## 在哪个 Agent 里用?
-
-`garden` 是标准 CLI,不是任何 Agent 的私有插件格式。各宿主只是"换个触发 `garden` 命令的入口":
-
-| 宿主 | 调用 | 定时 |
+| 角色 | 权限 | 类比 |
 |---|---|---|
-| Claude Code | `SKILL.md` + 直接命令 | 手动/外部 cron |
-| Codex | `codex exec` | app Automations |
-| Hermes/OpenClaw | cron job 的 prompt | 内置 cron scheduler |
-| Cursor | MCP/rules | 外部 cron |
+| **园丁 Plugin** | 全库只读审计 + 生成提案 + 应用已授权写 | 园丁巡视,提建议,按授权动花 |
+| **人(园主)** | 唯一的授权来源(在 Notion 审批) | 只有园主能授权移栽 |
 
-**详细接入步骤见 [`docs/agent-adapters.md`](docs/agent-adapters.md)**。
+**Obsidian** = 知识真相源(可 Git、可迁移、双链图谱);**Notion** = 执行跟踪 + 人机交互(移动端审批/提醒/周报);**授权模型** = 分级信任(L0/L1 自动,L2/L3 在 Notion 审批),所有 Evergreen 写入可追溯。
 
-## 当前状态
+## 📦 入口动词
 
-设计已确认,一期 MVP 已实现(**44 tests pass**,含 `garden init` 自动化引导)。
+| 入口 | 用途 | 风险 |
+|---|---|---|
+| 🌱 `init` | 首次引导:自动建 vault 骨架 + Notion 4 库 + 插件清单(OAuth 是唯一人工断点) | L0 |
+| 🔍 `weekly-audit` | 只读审计 vault(孤岛/过时/Inbox),生成提案入 Notion | 不写 Evergreen |
+| ✅ `apply-approved` | 轮询 Notion 已批准提案 → apply 到 Evergreen + git commit + 回写 | L2/L3 需授权 |
+| 📥 `triage-inbox` | 列出 `_System/_Inbox/` 待处理 Raw | 只读 |
 
-## 仓库结构
+入口动词是标准 CLI(`garden`),不是任何 Agent 的私有插件格式——所有能调 shell 的 Agent 宿主都能用。详见 [Agent 宿主适配指南](docs/agent-adapters.md)。
+
+## 🛡️ 安全模型(L0-L3)
+
+| 风险档 | 操作类型 | 执行路径 |
+|---|---|---|
+| 🟢 L0 自由 | 追加 Raw/Drafts/Reports | 直接写 |
+| 🟡 L1 自动+留痕 | 修改已有笔记的元数据/链接 | 自动写 + git commit |
+| 🟠 L2 需审批 | 新增 Evergreen / 改正文结论 | Notion 提案 → approve → apply |
+| 🔴 L3 需审批+二次确认 | 删除/移动/重命名 | Notion 提案 → approve → 二次确认 → apply |
+
+**红线**:无 Notion `approved` 凭证绝不写 Evergreen L2+;L3 破坏性操作即便已批准,定时场景下也拒(需人在场);git pull 失败必须中止。
+
+---
+
+## 🚀 安装
+
+### Claude Code(插件市场)
 
 ```
-knowledge-garden-skill/
-├── SKILL.md                  Agent 入口说明(各入口动词怎么调)
-├── pyproject.toml
-├── garden_gardener/          园丁 plugin 主体(Python)
-│   ├── config.py             加载/校验 gardener.config.yaml
-│   ├── risk.py               风险分级判定(WHO×WHAT 安全闸)
-│   ├── frontmatter.py        YAML frontmatter 解析
-│   ├── vault.py              vault 访问抽象层(CLI 优先 + filesystem 降级)
-│   ├── gitutil.py            git 操作封装(带 gardener 前缀 + notion-id)
-│   ├── notion.py             Notion MCP 客户端封装
-│   ├── audit.py              只读审计(孤岛/过时/Inbox)
-│   ├── proposal.py           提案生成 + Notion 失败降级暂存
-│   ├── apply.py              轮询 approved → apply + commit + 回写
-│   ├── init_vault.py         vault 骨架初始化(幂等)
-│   ├── init_notion.py        Notion 4 库 schema + 自动创建
-│   ├── init_plugins.py       Obsidian 插件启用清单 + 安装指引
-│   ├── init_orchestrator.py  init 编排(checkpoint 续跑 + OAuth 断点)
-│   └── cli_entry.py          CLI 入口(init/weekly-audit/apply-approved/triage-inbox)
-├── templates/                Obsidian vault 模板
-├── tests/                    44 tests,全 pass
-└── docs/
-    ├── knowledge-garden-design.md       完整设计方案
-    └── superpowers/plans/               实现计划
+/plugin marketplace add https://github.com/sisibeloved/knowledge-garden-skill
+/plugin install knowledge-garden-gardener
 ```
 
-## 运行
+安装后,Agent 通过 `using-garden` skill 按需加载入口动词。
+
+### Codex CLI
 
 ```bash
-pip install -e . pytest pyyaml httpx
+codex plugin marketplace add https://github.com/sisibeloved/knowledge-garden-skill
+codex plugin add knowledge-garden-gardener@knowledge-garden
+```
 
-# 首次引导(自动建 vault + Notion 库 + 插件清单,OAuth 是唯一人工断点)
+### 本地开发安装
+
+```bash
+git clone https://github.com/sisibeloved/knowledge-garden-skill
+cd knowledge-garden-skill/plugins/knowledge-garden-gardener
+pip install -e . pytest pyyaml httpx
+```
+
+## 💬 使用示例
+
+```bash
+# 首次引导(自动建 vault + Notion 库,OAuth 是唯一人工断点)
 garden init --vault ./Garden --mcp-endpoint <endpoint> --parent-page <notion-page-id>
 # OAuth 完成后续跑
 garden init --vault ./Garden --mcp-endpoint <endpoint> --parent-page <notion-page-id> --oauth-done
 
-# 审计(在 vault 根目录)
+# 每周巡园(只读审计 + 生成提案入 Notion,不写 Evergreen)
 garden --config _Config/gardener.config.yaml --vault . weekly-audit
-# 应用已批准提案
-garden --config _Config/gardener.config.yaml --vault . apply-approved
+
+# 应用已批准提案(定时场景用 --actor scheduled_run)
+garden --config _Config/gardener.config.yaml --vault . --actor scheduled_run apply-approved
 ```
 
-测试:`python -m pytest -v`
+---
+
+## 📁 仓库结构
+
+```
+knowledge-garden-skill/
+├── .claude-plugin/marketplace.json          Claude Code 插件市场注册
+├── .agents/plugins/marketplace.json         Codex CLI 插件市场注册
+├── README.md
+├── docs/
+│   ├── knowledge-garden-design.md           完整设计方案(6 章 + 附录)
+│   ├── agent-adapters.md                    Agent 宿主适配指南
+│   └── superpowers/plans/                   实现计划
+└── plugins/knowledge-garden-gardener/       插件本体
+    ├── .claude-plugin/plugin.json           Claude Code 插件元数据
+    ├── .codex-plugin/plugin.json            Codex CLI 插件元数据
+    ├── package.json
+    ├── CHANGELOG.md
+    ├── skills/using-garden/SKILL.md         入口 router 技能
+    ├── garden_gardener/                      Python CLI 主体(13 模块)
+    ├── templates/gardener.config.yaml        配置模板
+    └── tests/                                46 tests,全 pass
+```
+
+## 🧪 测试
+
+```bash
+cd plugins/knowledge-garden-gardener
+python -m pytest -v
+```
+
+当前:46 tests pass,覆盖 config/risk/frontmatter/vault/gitutil/notion/audit/proposal/apply/init 全模块。
+
+## 📚 文档
+
+- [完整设计方案](docs/knowledge-garden-design.md) — 6 章 + 决策记录 + 术语表
+- [Agent 宿主适配指南](docs/agent-adapters.md) — Claude Code/Codex/Hermes/OpenClaw 接入步骤
+- [变更日志](plugins/knowledge-garden-gardener/CHANGELOG.md)
+
+## 🔗 设计参考
+
+| 项目 | 借鉴点 |
+|---|---|
+| [Kohei-Wada/knowledge-gardener](https://github.com/Kohei-Wada/knowledge-gardener) | WHEN/HOW 分离的园丁决策层 |
+| [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) | Obsidian 官方 CLI 护栏(13 silent failures) |
+| [Notion 官方 MCP](https://developers.notion.com/guides/mcp/overview) | Notion 数据库 + 提案库自动化 |
+
+## License
+
+MIT

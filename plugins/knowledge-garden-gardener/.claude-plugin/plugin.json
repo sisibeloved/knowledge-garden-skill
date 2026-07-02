@@ -1,0 +1,36 @@
+{
+  "name": "knowledge-garden-gardener",
+  "version": "0.2.0",
+  "description": "知识花园园丁:只读审计 Obsidian vault、生成提案入 Notion、轮询已批准提案 apply 到 Evergreen。Agent 当园丁,人定稿。",
+  "author": {
+    "name": "luchen"
+  },
+  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "notion",
+    "knowledge-garden",
+    "second-brain",
+    "agent",
+    "audit",
+    "proposal",
+    "evergreen"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Knowledge Garden Gardener",
+    "shortDescription": "审计 Obsidian、提案入 Notion、应用已批准的 Evergreen 写入",
+    "longDescription": "知识花园园丁 plugin。核心理念:Agent 当园丁不当作者——负责搜、整理、补链接、生成草稿、发现孤岛与矛盾;真正进入长期知识库的结论必须经人在 Notion 移动端审批。Obsidian 是知识真相源(可 Git、可迁移),Notion 是执行跟踪与人机交互层。",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "帮我初始化知识花园",
+      "跑一下巡园审计",
+      "应用已批准的提案"
+    ]
+  }
+}

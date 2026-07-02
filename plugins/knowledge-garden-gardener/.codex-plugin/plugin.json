@@ -1,0 +1,20 @@
+{
+  "name": "knowledge-garden-gardener",
+  "version": "0.2.0",
+  "description": "知识花园园丁:只读审计 Obsidian vault、生成提案入 Notion、轮询已批准提案 apply 到 Evergreen。Agent 当园丁,人定稿。",
+  "author": {
+    "name": "luchen"
+  },
+  "license": "MIT",
+  "keywords": [
+    "obsidian",
+    "notion",
+    "knowledge-garden",
+    "second-brain",
+    "agent",
+    "audit",
+    "proposal",
+    "evergreen"
+  ],
+  "skills": "./skills/"
+}

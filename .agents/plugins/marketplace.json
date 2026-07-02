@@ -1,0 +1,18 @@
+{
+    "name": "knowledge-garden",
+    "interface": {
+        "displayName": "Knowledge Garden"
+    },
+    "plugins": [
+        {
+            "name": "knowledge-garden-gardener",
+            "source": {
+                "source": "git-subdir",
+                "url": "https://github.com/sisibeloved/knowledge-garden-skill.git",
+                "ref": "main",
+                "path": "plugins/knowledge-garden-gardener"
+            },
+            "category": "workflow"
+        }
+    ]
+}
