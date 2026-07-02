@@ -13,8 +13,11 @@
     "second-brain",
     "agent",
     "audit",
-    "proposal",
-    "evergreen"
+    "proposal"
   ],
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Knowledge Garden Gardener",
+    "shortDescription": "审计 Obsidian、提案入 Notion、应用已批准的 Evergreen 写入"
+  }
 }

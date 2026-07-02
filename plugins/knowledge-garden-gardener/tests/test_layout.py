@@ -28,9 +28,13 @@ def test_codex_marketplace_exists():
 
 def test_plugin_layout():
     base = ROOT / "plugins" / "knowledge-garden-gardener"
-    # 双宿主元数据
+    # 三宿主元数据(Claude/Codex/OpenClaw)
     assert (base / ".claude-plugin" / "plugin.json").exists()
     assert (base / ".codex-plugin" / "plugin.json").exists()
+    assert (base / "openclaw.plugin.json").exists()
+    # Hermes 薄包装
+    assert (base / "hermes-plugin" / "garden" / "plugin.yaml").exists()
+    assert (base / "hermes-plugin" / "garden" / "__init__.py").exists()
     # package.json
     assert (base / "package.json").exists()
     # 入口 router skill

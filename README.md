@@ -1,9 +1,11 @@
 # 🌿 知识花园园丁
 
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
-[![Codex](https://img.shields.io/badge/Codex-plugin-0A7EA4.svg)](#codex-cli)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#claude-code插件市场)
-[![Tests](https://img.shields.io/badge/tests-46%20pass-success.svg)](#测试)
+[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#安装)
+[![Codex](https://img.shields.io/badge/Codex-plugin-0A7EA4.svg)](#安装)
+[![OpenClaw](https://img.shields.io/badge/OpenClaw-bundle-8A2BE2.svg)](#安装)
+[![Hermes](https://img.shields.io/badge/Hermes-plugin-FF6B35.svg)](#安装)
+[![Tests](https://img.shields.io/badge/tests-65%20pass-success.svg)](#测试)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 面向个人工作流的知识花园复合技能插件,以 Claude Code / Codex 插件形式交付。核心理念:**Agent 当园丁,不当作者**——负责搜、整理、补链接、生成草稿、发现孤岛与矛盾;真正进入长期知识库的结论必须经人在 Notion 移动端审批。
@@ -60,6 +62,21 @@
 codex plugin marketplace add https://github.com/sisibeloved/knowledge-garden-skill
 codex plugin add knowledge-garden-gardener@knowledge-garden
 ```
+
+### OpenClaw(Plugin Bundles,几乎免费兼容)
+
+OpenClaw 原生支持把 Claude/Codex 插件当 bundle 安装,无需额外格式:
+```bash
+openclaw plugins install knowledge-garden-gardener@knowledge-garden
+```
+
+### Hermes(薄 plugin 包装)
+
+```bash
+cp -r plugins/knowledge-garden-gardener/hermes-plugin/garden ~/.hermes/plugins/garden
+hermes plugins enable garden
+```
+Hermes 包装把 garden 4 个入口注册为 tool + `/garden` slash command。
 
 ### 本地开发安装
 

@@ -6,14 +6,14 @@
     },
     "metadata": {
         "description": "知识花园园丁:Agent 当园丁不当作者,审计 Obsidian + Notion,人定稿",
-        "version": "0.2.0"
+        "version": "0.3.0"
     },
     "plugins": [
         {
             "name": "knowledge-garden-gardener",
             "source": "./plugins/knowledge-garden-gardener",
             "description": "知识花园园丁 plugin:只读审计 Obsidian vault、生成提案入 Notion、轮询已批准提案 apply 到 Evergreen。分级信任 L0-L3,所有 Evergreen 写入可追溯。",
-            "version": "0.2.0",
+            "version": "0.3.0",
             "author": {
                 "name": "luchen"
             },
