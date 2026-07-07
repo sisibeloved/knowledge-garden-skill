@@ -73,10 +73,13 @@ openclaw plugins install knowledge-garden-gardener@knowledge-garden
 ### Hermes(薄 plugin 包装)
 
 ```bash
-cp -r plugins/knowledge-garden-gardener/hermes-plugin/garden ~/.hermes/plugins/garden
+# plugins 目录因平台而异,用 Hermes 自身查询(不要假设 ~/.hermes/)
+PLUGINS_DIR=$(python -c "from hermes_cli.plugins_cmd import _plugins_dir; print(_plugins_dir())")
+mkdir -p "$PLUGINS_DIR/garden"
+cp -r plugins/knowledge-garden-gardener/hermes-plugin/garden/* "$PLUGINS_DIR/garden/"
 hermes plugins enable garden
 ```
-Hermes 包装把 garden 4 个入口注册为 tool + `/garden` slash command。
+Hermes 包装把 garden 4 个入口注册为 tool + `hermes garden` CLI 子命令。
 
 ### 本地开发安装
 

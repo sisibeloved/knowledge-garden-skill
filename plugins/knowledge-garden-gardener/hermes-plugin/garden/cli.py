@@ -1,0 +1,61 @@
+"""CLI commands for the garden plugin — wires ``hermes garden <subcommand>``.
+
+mirrors google_meet/cli.py 的 argparse 模式:
+  setup_fn(subparser)  注册子命令树
+  handler_fn(args)     执行(转调 tools handler)
+"""
+from __future__ import annotations
+import argparse
+import shlex
+from typing import Any, List
+
+from . import tools
+
+
+_VERBS = ("init", "weekly-audit", "apply-approved", "triage-inbox")
+
+
+def register_cli(subparser: argparse.ArgumentParser) -> None:
+    """Build the ``hermes garden`` argparse tree."""
+    subs = subs = subparser.add_subparsers(dest="garden_command")
+
+    init_p = subs.add_parser("init", help="首次引导知识花园(vault + Notion 库)")
+    init_p.add_argument("--vault", default=".", help="vault 根目录")
+    init_p.add_argument("--mcp-endpoint", required=False, help="Notion MCP endpoint")
+    init_p.add_argument("--parent-page", required=False, help="Notion 父页面 id")
+    init_p.add_argument("--oauth-done", action="store_true", help="已完成 Notion OAuth")
+
+    for verb in ("weekly-audit", "apply-approved", "triage-inbox"):
+        p = subs.add_parser(verb, help=f"garden {verb}")
+        p.add_argument("--vault", default=None, help="vault 根目录")
+        p.add_argument("--config", default=None, help="gardener.config.yaml 路径")
+        if verb == "apply-approved":
+            p.add_argument("--actor", default=None,
+                           choices=("manual_session", "scheduled_run"),
+                           help="操作主体(定时用 scheduled_run)")
+
+
+def garden_command(args: argparse.Namespace) -> str:
+    """Dispatch ``hermes garden <verb>`` to the matching tool handler."""
+    verb = getattr(args, "garden_command", None)
+    if verb is None or verb in (None, "help"):
+        return "用法: hermes garden <init|weekly-audit|apply-approved|triage-inbox> [...]"
+    if verb not in _VERBS:
+        return f"未知子命令 '{verb}'。可用: {', '.join(_VERBS)}"
+
+    tool_args: dict[str, Any] = {}
+    if getattr(args, "vault", None):
+        tool_args["vault"] = args.vault
+    if getattr(args, "config", None):
+        tool_args["config"] = args.config
+    if getattr(args, "actor", None):
+        tool_args["actor"] = args.actor
+    if getattr(args, "mcp_endpoint", None):
+        tool_args["mcp_endpoint"] = args.mcp_endpoint
+    if getattr(args, "parent_page", None):
+        tool_args["parent_page"] = args.parent_page
+    if getattr(args, "oauth_done", False):
+        tool_args["oauth_done"] = True
+
+    handler = tools.HANDLERS[verb]
+    return handler(tool_args)

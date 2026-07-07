@@ -1,14 +1,14 @@
 name: garden
 version: 0.3.0
-description: >
-  知识花园园丁 plugin 的 Hermes 薄包装。把 garden CLI 的 4 个入口动词
-  (init/weekly-audit/apply-approved/triage-inbox)注册为 Hermes tool 和
-  /garden slash command,内部用 subprocess 调 garden。
-  前置:需先 pip install knowledge-garden-gardener 使 garden 命令可用。
+description: "知识花园园丁 plugin 的 Hermes 薄包装。把 garden CLI 的 4 个入口(init/weekly-audit/apply-approved/triage-inbox)注册为 Hermes tool 和 hermes garden 子命令,内部 subprocess 调 garden。前置:需先 pip install knowledge-garden-gardener 使 garden 命令可用。"
+author: luchen
+kind: standalone
+platforms:
+  - linux
+  - macos
+  - windows
 provides_tools:
   - garden_init
   - garden_weekly_audit
   - garden_apply_approved
   - garden_triage_inbox
-author:
-  name: luchen

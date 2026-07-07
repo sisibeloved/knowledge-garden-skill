@@ -11,8 +11,8 @@ OpenClaw 与 Hermes 宿主适配。
 ### Added
 
 - 新增 `openclaw.plugin.json`(native manifest),让 OpenClaw 识别更稳。OpenClaw 的 Plugin Bundles 机制原生兼容 Claude/Codex 格式,几乎零额外工作——它自动检测 `.claude-plugin/plugin.json` 把 `skills/` 当 skill 加载。
-- 新增 `hermes-plugin/garden/` 薄包装(plugin.yaml + __init__.py + tools.py + schemas.py):把 garden 4 个入口动词注册为 4 个 Hermes tool(LLM 自动调用)+ 1 个 `/garden` slash command(用户手动),内部 subprocess 调 garden CLI。handler 参数对齐真实 CLI(--vault/--config/--actor),非虚构 --path。
-- 新增 `tests/test_hermes_plugin.py`(14 tests):覆盖 build_command 参数拼装、register(ctx) 注册逻辑、slash command 路由、handler 不 raise、plugin.yaml 校验、schemas 参数对齐真实 CLI。
+- 新增 `hermes-plugin/garden/` 薄包装(plugin.yaml + __init__.py + tools.py + schemas.py + cli.py):把 garden 4 个入口动词注册为 4 个 Hermes tool(LLM 自动调用)+ `hermes garden` CLI 子命令(用户手动),内部 subprocess 调 garden CLI。handler 参数对齐真实 CLI(--vault/--config/--actor),非虚构 --path。
+- 新增 `tests/test_hermes_plugin.py`(13 tests):覆盖 build_command 参数拼装、register(ctx) 注册逻辑、cli setup_fn/handler_fn 路由、handler 不 raise、plugin.yaml 校验、schemas 参数对齐真实 CLI。
 - 扩充 `tests/test_layout.py`:守卫 OpenClaw manifest 与 Hermes 包装目录存在。
 
 ### Changed
@@ -20,6 +20,7 @@ OpenClaw 与 Hermes 宿主适配。
 - `docs/agent-adapters.md` 重写:核实并记录四宿主(Claude Code/Codex/OpenClaw/Hermes)真实接入方式,纠正之前笼统描述。明确 OpenClaw 的 Gateway 级 cron ≠ agent tools.exec 区分。
 - README 增加 OpenClaw/Hermes badge 与安装分区。
 - 三处版本(plugin.json/package.json/openclaw.plugin.json/plugin.yaml/marketplace.json)对齐到 0.3.0。
+- **本机 Hermes v0.18.0 实测验证**:`hermes plugins list` 显示 garden/enabled/0.3.0/user;`register(ctx)` 成功注册 4 tool + 1 cli command;`hermes garden --help` 显示 4 子命令。修正了安装路径文档(真实路径是 `get_hermes_home()/plugins`,非 `~/.hermes/plugins/`——后者是历史遗留)。Hermes plugin API 从本机 bundled plugin(google_meet)反推确认:`register_cli_command`(非 `register_command`)+ `register_tool` 带 `emoji`/`check_fn`/`toolset`。
 
 ## [0.2.0] - 2026-07-02
 

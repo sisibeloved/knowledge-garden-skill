@@ -57,19 +57,24 @@ openclaw cron add --schedule "0 9 * * 0" \
 
 ## 4. Hermes(薄 plugin 包装)
 
-Hermes 有原生 Python plugin 系统(`plugin.yaml` + `register(ctx)`)。我们提供 `hermes-plugin/garden/` 薄包装,把 garden 4 个入口注册成 **4 个 tool**(LLM 自动调用)+ **1 个 `/garden` slash command**(用户手动)。
+Hermes 有原生 Python plugin 系统(`plugin.yaml` + `register(ctx)`)。我们提供 `hermes-plugin/garden/` 薄包装,把 garden 4 个入口注册成 **4 个 tool**(LLM 自动调用)+ **`hermes garden` CLI 子命令**(用户手动)。
 
-**安装**:把 `hermes-plugin/garden/` 复制到 `~/.hermes/plugins/garden/`,然后:
+**安装**:把 `hermes-plugin/garden/` 复制到 Hermes plugins 目录(注意:不是 `~/.hermes/plugins/`,而是 `hermes plugins install` 用的真实目录,可用 `python -c "from hermes_cli.plugins_cmd import _plugins_dir; print(_plugins_dir())"` 查询;Windows 上通常是 `C:\Users\<用户>\AppData\Local\hermes\plugins`):
 ```bash
+PLUGINS_DIR=$(python -c "from hermes_cli.plugins_cmd import _plugins_dir; print(_plugins_dir())")
+mkdir -p "$PLUGINS_DIR/garden"
+cp -r plugins/knowledge-garden-gardener/hermes-plugin/garden/* "$PLUGINS_DIR/garden/"
 hermes plugins enable garden
-hermes  # 启动后 /garden 可用
+hermes  # 启动后 garden tool 和 hermes garden 子命令可用
 ```
 
 **使用**:
 - LLM 自主:`garden_weekly_audit` 等 tool(模型按 schema 决定何时调)
-- 手动:`/garden weekly-audit --vault ./Garden`、`/garden init --mcp-endpoint <ep> --parent-page <pp>`
+- 手动:`hermes garden weekly-audit --vault ./Garden`、`hermes garden init --mcp-endpoint <ep> --parent-page <pp>`
 
 **定时**:用 Hermes 内置 [cron scheduler](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron),job 的 prompt 让 agent 调 garden tool。([Build a Hermes Plugin](https://hermes-agent.nousresearch.com/docs/guides/build-a-hermes-plugin))
+
+**本机验证记录(v0.18.0)**:`register(ctx)` 成功注册 4 tool + 1 cli command;`hermes garden --help` 显示 4 个子命令;`hermes plugins list` 显示 `garden / enabled / 0.3.0 / user`。
 
 ---
 
