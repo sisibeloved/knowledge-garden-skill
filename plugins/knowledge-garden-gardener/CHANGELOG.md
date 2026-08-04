@@ -4,6 +4,36 @@
 
 格式基于 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/),版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [0.3.1] - 2026-08-04
+
+修复 3 个 bug + 改进 `garden init` 安装前置(`pyproject.toml` 缺 build-system 导致 `pip install -e .` 失败)。
+
+### Fixed
+
+- **`garden` CLI `--config` 默认相对 CWD 解析**:argparse `default="_Config/gardener.config.yaml"` 没有 vault 上下文,任何不显式传 `--config` 的调用必 `FileNotFoundError`。改成 `default=None`,新增 `_resolve_config_path()` 回退到 `<vault>/_Config/gardener.config.yaml`;`load_config` 失败给 exit 5 + 友好引导(指向 `garden init`)。
+- **Notion 不可达裸 traceback**:`apply-approved` / `weekly-audit` 路径没 try/except,`httpx.RequestError` / `UnsupportedProtocol` 直接抛栈给 caller(scheduled_run cron 会误判)。包 `httpx.HTTPError, httpx.RequestError`,`apply-approved` 退出 4 + 提示幂等重试;`weekly-audit` 降级到 stderr 警告 + 继续走本地 `_PendingProposals/` 暂存(已有机制)。
+- **`hermes garden <verb>` 子命令 stdout 被吞**:Hermes dispatcher(`hermes_cli/main.py:12562-12565`)只把 handler 的 `int` 返回值当 exit code,字符串返回值整体丢弃。改 `garden_command` 返回 int,直接 `print` stdout/stderr,JSON 解析分别走 ok/失败路径。未知子命令返回 rc=1。
+- **`triage-inbox` 不再误依赖 config**:`triage-inbox` 业务逻辑只需要 `audit(vault)`,但旧实现把它和另外两个 Notion 命令一起放在 `load_config` 之后,设计误差。把它移到 `load_config` 之前,**恢复"vault-only"语义**。
+
+### Added
+
+- 新增 `tests/test_cli_subcommand_errors.py`(4 tests):
+  - `test_triage_inbox_runs_without_config`
+  - `test_triage_inbox_with_explicit_config`
+  - `test_weekly_audit_missing_config_exits_5`
+  - `test_apply_approved_notion_unreachable_exits_4`
+- 新增 vault 模板占位符入仓(`.gitkeep`):`Concepts/`, `Notes/`, `Index/`, `References/`, `_Config/`, `_System/`, `_Templates/` —— 这些是 `init_vault.py` 骨架输出,但之前没有 `.gitkeep` 占位,导致 git 不入仓。
+
+### Changed
+
+- `pyproject.toml` 补 `[build-system]` 和 `[tool.setuptools.packages.find]`:`pip install -e .` 之前因"Multiple top-level packages discovered"(setuptools 68+ 默认拒绝自动发现)失败,现在能直接装。
+- `.gitignore` 加 `.garden-init.json` 排除 init 运行时 checkpoint。
+
+### Verified
+
+- `pytest tests/ -q` → **68 passed**(原 64 + 新 4)。
+- 端到端实测:`garden --vault X triage-inbox`(无 config)→ exit 0;`garden --vault X weekly-audit`(无 config)→ exit 5 + 引导;`garden --vault X apply-approved`(Notion 占位符)→ exit 4 无 traceback;`hermes garden triage-inbox --vault X` → stdout 可见(Bug 3 修复);`garden init` → 仍 exit 3 OAuth 指引。
+
 ## [0.3.0] - 2026-07-02
 
 OpenClaw 与 Hermes 宿主适配。

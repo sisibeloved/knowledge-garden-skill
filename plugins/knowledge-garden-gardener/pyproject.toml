@@ -1,3 +1,10 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["garden_gardener*"]
+
 [project]
 name = "knowledge-garden-gardener"
 version = "0.1.0"

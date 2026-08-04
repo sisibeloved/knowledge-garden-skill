@@ -1,0 +1,10 @@
+# Obsidian 本地状态(不进 Git,避免多机冲突)
+.obsidian/workspace*.json
+.obsidian/plugins/*/data.json
+*.cache
+_Trash/
+
+# garden init 运行时产物(checkpoint + 内部状态),不应入库
+.garden-init.json
+# Tests:临时样本 / checkpoint 不应入库
+tests/.garden-*
