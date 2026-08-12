@@ -60,6 +60,8 @@ access:
 notion:
   proposal_database_id: "__PROPOSAL_DB__"
   projects_database_id: "__PROJECTS_DB__"
+  tasks_database_id: "__TASKS_DB__"
+  weekly_database_id: "__WEEKLY_DB__"
   mcp_endpoint: "__MCP_ENDPOINT__"
 """
 
@@ -133,6 +135,8 @@ def run_init(*, vault_root: Path, config_path: Path, checkpoint: Path,
         text = (_CONFIG_TEMPLATE
                 .replace("__PROPOSAL_DB__", state.database_ids.get("待审核提案", ""))
                 .replace("__PROJECTS_DB__", state.database_ids.get("Projects", ""))
+                .replace("__TASKS_DB__", state.database_ids.get("Tasks", ""))
+                .replace("__WEEKLY_DB__", state.database_ids.get("周报", ""))
                 .replace("__MCP_ENDPOINT__", client.endpoint))
         config_path.write_text(text, encoding="utf-8")
         state.steps["config_written"] = True

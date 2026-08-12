@@ -12,7 +12,8 @@ from typing import Any, List
 from . import tools
 
 
-_VERBS = ("init", "weekly-audit", "apply-approved", "triage-inbox")
+_VERBS = ("init", "weekly-audit", "apply-approved", "triage-inbox",
+          "review-orphans", "capture")
 
 
 def register_cli(subparser: argparse.ArgumentParser) -> None:
@@ -25,7 +26,7 @@ def register_cli(subparser: argparse.ArgumentParser) -> None:
     init_p.add_argument("--parent-page", required=False, help="Notion 父页面 id")
     init_p.add_argument("--oauth-done", action="store_true", help="已完成 Notion OAuth")
 
-    for verb in ("weekly-audit", "apply-approved", "triage-inbox"):
+    for verb in ("weekly-audit", "apply-approved", "triage-inbox", "review-orphans"):
         p = subs.add_parser(verb, help=f"garden {verb}")
         p.add_argument("--vault", default=None, help="vault 根目录")
         p.add_argument("--config", default=None, help="gardener.config.yaml 路径")
@@ -34,12 +35,20 @@ def register_cli(subparser: argparse.ArgumentParser) -> None:
                            choices=("manual_session", "scheduled_run"),
                            help="操作主体(定时用 scheduled_run)")
 
+    # capture 有专属参数(--text 必填)
+    cap_p = subs.add_parser("capture", help="随手记 → 路由 Raw 或 Notion Task")
+    cap_p.add_argument("--vault", default=None, help="vault 根目录")
+    cap_p.add_argument("--config", default=None, help="gardener.config.yaml 路径(可选)")
+    cap_p.add_argument("--text", required=True, help="随手记文本")
+    cap_p.add_argument("--source", default=None, help="来源(manual/web/...)")
+
 
 def garden_command(args: argparse.Namespace) -> str:
     """Dispatch ``hermes garden <verb>`` to the matching tool handler."""
     verb = getattr(args, "garden_command", None)
     if verb is None or verb in (None, "help"):
-        return "用法: hermes garden <init|weekly-audit|apply-approved|triage-inbox> [...]"
+        return ("用法: hermes garden "
+                "<init|weekly-audit|apply-approved|triage-inbox|review-orphans|capture> [...]")
     if verb not in _VERBS:
         return f"未知子命令 '{verb}'。可用: {', '.join(_VERBS)}"
 
@@ -56,6 +65,10 @@ def garden_command(args: argparse.Namespace) -> str:
         tool_args["parent_page"] = args.parent_page
     if getattr(args, "oauth_done", False):
         tool_args["oauth_done"] = True
+    if getattr(args, "text", None):
+        tool_args["text"] = args.text
+    if getattr(args, "source", None):
+        tool_args["source"] = args.source
 
     handler = tools.HANDLERS[verb]
     return handler(tool_args)

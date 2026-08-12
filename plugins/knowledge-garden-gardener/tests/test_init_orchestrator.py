@@ -31,10 +31,14 @@ def test_init_completes_all_steps_when_oauth_done(tmp_path: Path):
     assert result == COMPLETED
     # vault 骨架建好
     assert (vault / "Concepts" / ".gitkeep").exists()
-    # config 写了 database id
+    # config 写了 database id(5 个库全部回填)
     cfg_text = config_path.read_text(encoding="utf-8")
     assert "db-Projects" in cfg_text
     assert "db-待审核提案" in cfg_text
+    assert "db-Tasks" in cfg_text
+    assert "db-周报" in cfg_text
+    assert "tasks_database_id" in cfg_text
+    assert "weekly_database_id" in cfg_text
     # 插件清单
     assert (vault / ".obsidian" / "community-plugins.json").exists()
     # checkpoint 标记完成

@@ -1,12 +1,45 @@
 """验证非 init 子命令的错误处理和配置回退。
 
-覆盖三个关键修复:
+覆盖关键修复:
 1. triage-inbox 不依赖 config 即可运行(不抛 FileNotFoundError)
 2. apply-approved Notion 不可达时优雅 exit 4,无 traceback
-3. weekly-audit / apply-approved 在缺 config 时给出 exit 5 + 友好引导
+3. weekly-audit / apply-approved / review-orphans 在缺 config 时给出 exit 5 + 友好引导
+4. capture 离线(无 config)能落 Raw;有 config 时尝试 Task 路径
+5. review-orphans 列出孤岛 + 生成提案(Notion 不可达降级暂存)
 """
 from pathlib import Path
 from garden_gardener.cli_entry import main
+
+# 完整可运行 config(invalid-no-protocol 触发 UnsupportedProtocol,不发请求,测降级)
+_CFG = """\
+version: 0.1
+risk_levels:
+  L0: {auto: true, needs_review: false, confirm: false}
+  L1: {auto: true, needs_review: false, confirm: false, log: commit}
+  L2: {auto: false, needs_review: true, confirm: once, log: commit+notion}
+  L3: {auto: false, needs_review: true, confirm: twice, log: commit+notion}
+operations:
+  append_raw: L0
+  append_draft: L0
+  generate_report: L0
+  create_proposal: L0
+  backfill_frontmatter: L1
+  add_wikilink: L1
+  add_tag: L1
+  create_evergreen: L2
+  update_conclusion: L2
+  merge_notes: L2
+  rename_evergreen: L3
+  move_evergreen: L3
+  delete_evergreen: L3
+actors:
+  manual_session: [L0, L1, L2, L3]
+  scheduled_run: [L0, L1]
+hard_disabled: []
+thresholds: {orphan_age_days: 7, stale_review_days: 90, confidence_min: 0.6, batch_l1_max: 50}
+access: {preferred: cli, fallback: filesystem}
+notion: {proposal_database_id: p, projects_database_id: q, mcp_endpoint: invalid-no-protocol, tasks_database_id: t, weekly_database_id: w}
+"""
 
 
 def _init_git_repo(p: Path) -> None:
@@ -162,3 +195,60 @@ notion: {proposal_database_id: p, projects_database_id: q, mcp_endpoint: invalid
     assert "Notion 不可达" in err
     assert "Traceback" not in err
     assert "幂等" in err  # 提示用户 retry 是安全的
+
+
+# ---------- capture ----------
+
+def test_capture_raw_without_config(tmp_path: Path, capsys):
+    """capture 离线(无 config):raw 文本直接落 Inbox,不需 Notion。"""
+    vault = tmp_path / "Garden"
+    vault.mkdir()
+    (vault / "_System" / "_Inbox").mkdir(parents=True)
+    rc = main(["--vault", str(vault), "capture", "--text", "RAG 检索增强"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "captured → raw" in out
+    from garden_gardener.vault import Vault
+    assert len(Vault(vault).read_glob("_System/_Inbox/*.md")) == 1
+
+
+def test_capture_task_falls_back_without_config(tmp_path: Path, capsys):
+    """capture 任务文本 + 无 config → 降级 raw_fallback(task_candidate)。"""
+    vault = tmp_path / "Garden"
+    vault.mkdir()
+    (vault / "_System" / "_Inbox").mkdir(parents=True)
+    rc = main(["--vault", str(vault), "capture", "--text", "明天要完成周报"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "raw_fallback" in out
+
+
+# ---------- review-orphans ----------
+
+def test_review_orphans_lists_orphans(tmp_path: Path, capsys):
+    """review-orphans 列出孤岛 + 生成提案(Notion 不可达降级暂存)。"""
+    vault = tmp_path / "Garden"
+    vault.mkdir()
+    (vault / "Concepts").mkdir(parents=True)
+    # 孤岛:无 links + 旧 created_at + 无 backlink
+    (vault / "Concepts" / "X.md").write_text(
+        "---\ntitle: 孤岛\ncreated_at: 2020-01-01\n---\n正文\n", encoding="utf-8")
+    cfg = vault / "_Config" / "gardener.config.yaml"
+    cfg.parent.mkdir(parents=True, exist_ok=True)
+    cfg.write_text(_CFG, encoding="utf-8")
+    rc = main(["--vault", str(vault), "--config", str(cfg), "review-orphans"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Concepts/X.md" in out
+    assert "1 orphans reviewed" in out
+
+
+def test_review_orphans_missing_config_exits_5(tmp_path: Path, capsys):
+    """review-orphans 缺 config → exit 5 + 引导(与 weekly-audit 一致)。"""
+    vault = tmp_path / "Garden"
+    vault.mkdir()
+    rc = main(["--vault", str(vault), "review-orphans"])
+    assert rc == 5
+    err = capsys.readouterr().err
+    assert "garden init" in err
+    assert "Traceback" not in err

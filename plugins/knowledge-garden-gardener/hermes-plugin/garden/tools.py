@@ -12,7 +12,7 @@ import subprocess
 def build_command(verb: str, args: dict) -> list[str]:
     """把 schema 参数(dict)转成 garden CLI 参数列表。
 
-    verb: init | weekly-audit | apply-approved | triage-inbox
+    verb: init | weekly-audit | apply-approved | triage-inbox | review-orphans | capture
     args: schema 里定义的 properties dict
     """
     cmd = ["garden"]
@@ -37,6 +37,11 @@ def build_command(verb: str, args: dict) -> list[str]:
     if actor:
         cmd += ["--actor", actor]
     cmd.append(verb)
+    # capture 的子命令参数(--text/--source)在 verb 之后
+    if verb == "capture":
+        cmd += ["--text", args["text"]]
+        if args.get("source"):
+            cmd += ["--source", args["source"]]
     return cmd
 
 
@@ -83,6 +88,12 @@ def garden_apply_approved(args, **kwargs):
 def garden_triage_inbox(args, **kwargs):
     return _run(build_command("triage-inbox", args))
 
+def garden_review_orphans(args, **kwargs):
+    return _run(build_command("review-orphans", args))
+
+def garden_capture(args, **kwargs):
+    return _run(build_command("capture", args))
+
 
 # verb → handler 映射(slash command 复用)
 HANDLERS = {
@@ -90,4 +101,6 @@ HANDLERS = {
     "weekly-audit": garden_weekly_audit,
     "apply-approved": garden_apply_approved,
     "triage-inbox": garden_triage_inbox,
+    "review-orphans": garden_review_orphans,
+    "capture": garden_capture,
 }

@@ -15,15 +15,17 @@ __all__ = ["register"]
 
 # (tool name, schema, handler, emoji)
 _TOOLS = (
-    ("garden_init",          schemas.INIT,          tools.garden_init,          "🌱"),
-    ("garden_weekly_audit",  schemas.WEEKLY_AUDIT,  tools.garden_weekly_audit,  "🔍"),
-    ("garden_apply_approved", schemas.APPLY_APPROVED, tools.garden_apply_approved, "✅"),
-    ("garden_triage_inbox",  schemas.TRIAGE_INBOX,  tools.garden_triage_inbox,  "📥"),
+    ("garden_init",            schemas.INIT,           tools.garden_init,            "🌱"),
+    ("garden_weekly_audit",    schemas.WEEKLY_AUDIT,   tools.garden_weekly_audit,    "🔍"),
+    ("garden_apply_approved",  schemas.APPLY_APPROVED, tools.garden_apply_approved,  "✅"),
+    ("garden_triage_inbox",    schemas.TRIAGE_INBOX,   tools.garden_triage_inbox,    "📥"),
+    ("garden_review_orphans",  schemas.REVIEW_ORPHANS, tools.garden_review_orphans,  "🏝"),
+    ("garden_capture",         schemas.CAPTURE,        tools.garden_capture,         "📱"),
 )
 
 
 def register(ctx) -> None:
-    """注册 4 个 tool + hermes garden 子命令。"""
+    """注册 6 个 tool + hermes garden 子命令。"""
     for name, schema, handler, emoji in _TOOLS:
         ctx.register_tool(
             name=name,
@@ -35,10 +37,11 @@ def register(ctx) -> None:
 
     ctx.register_cli_command(
         name="garden",
-        help="知识花园园丁 (init / weekly-audit / apply-approved / triage-inbox)",
+        help="知识花园园丁 (init / weekly-audit / apply-approved / triage-inbox / review-orphans / capture)",
         setup_fn=_register_garden_cli,
         handler_fn=_garden_command,
         description=(
-            "运行 garden CLI:初始化知识花园、跑巡园审计、应用已批准提案、整理 Inbox。"
+            "运行 garden CLI:初始化、巡园审计、应用已批准提案、整理 Inbox、"
+            "审查孤岛、随手记捕获。"
         ),
     )

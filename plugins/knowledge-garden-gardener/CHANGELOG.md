@@ -4,6 +4,36 @@
 
 格式基于 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/),版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [0.4.0] - 2026-08-12
+
+补齐设计 §5.2 全部 5 个标准入口动词。原仅 `apply-approved` 完整,本次新增 `review-orphans`/`capture`,补全 `weekly-audit`(L1 自动 apply + 周报)与 `triage-inbox`(归类建议),并扩展 Notion 基础设施(第 5 库 + Task/周报写入)。
+
+### Added
+
+- **`review-orphans` 入口动词**:只读审计孤岛 + 生成补链提案入 Notion(L2 link)。复用 `audit()` 取 orphans,聚焦孤岛,不写 Evergreen。
+- **`capture` 入口动词**:手机/手动随手记 → 路由 Obsidian Raw 或 Notion Task。关键词规则树判定(§4.5.5),Task 不可达时降级落 Raw(`type=task_candidate`),离线可用。新增 `capture.py`(route + 落地原语)。
+- **L1 自动 apply 引擎**(`l1_apply.py`):weekly-audit 本轮自动执行三类 L1 操作(无需 Notion 凭证)——backfill 缺失 frontmatter(id/created_at/updated_at/status)、关键词补链(正文命中标题 → `[[ ]]` + links)、英文高频词补 tags(仅空 tags 时;中文分词待二期)。每类一个 git commit(可整类 revert),受 `batch_l1_max` 截断。
+- **周报生成**(`weekly_report.py`):审计数据 + Projects 活动 → markdown 报告。双写:本地 `_System/_Reports/weekly-report.md`(始终)+ Notion 周报队列(若配置,失败降级 stderr 警告)。
+- **`triage-inbox` 归类建议**(`triage.py`):对每个 inbox item 给 next step(任务候选→Task / 含 URL→Reference / 概念→Evergreen)。只读,不写。
+- **Notion 第 5 库「周报」**(`init_notion.py`):独立交互库(§5.5),schema 含 week/summary/各 count/generated_at。`garden init` 现在建 5 库并回填 5 个 id。
+- **`NotionClient.create_task` / `write_weekly_report`**:capture 路由 + 周报写入;db 未配置时抛 `NotionConfigError`(新异常),调用方据此优雅降级。
+- **Hermes 侧 6 tool / 6 cli 子命令**:新增 `garden_review_orphans`/`garden_capture` tool + `hermes garden review-orphans|capture` 子命令;schemas/tools/cli/plugin.yaml 同步。
+
+### Changed
+
+- **`NotionClient` 构造扩参** `tasks_db`/`weekly_db`(关键字字参数,默认空):老 config(无 tasks/weekly id)构造不破坏,对应方法抛 `NotionConfigError` 降级。`weekly-audit`/`apply-approved`/`review-orphans` 路径从 `cfg.notion` 读取并传入。
+- **config notion 块** 加 `tasks_database_id`/`weekly_database_id`(`init_orchestrator._CONFIG_TEMPLATE` + `templates/gardener.config.yaml`)。`garden init` 自动回填;手写 config 可留空(对应能力降级)。
+- **`weekly-audit` 主流程**:audit + emit_proposals 之后,串接 `apply_l1`(L1 自动写 + commit)+ `summarize`/`publish`(周报)。各 Notion 异常独立 try/except,互不阻断。
+
+### Fixed
+
+- **`pyproject.toml` version 历史遗漏**:停留在 `0.1.0`(0.2.0 起其它清单文件已同步到 0.3.x,pyproject 漏更)。本次一并修正到 `0.4.0`。
+
+### Verified
+
+- `pytest tests/ -q` → **118 passed**(原 76 + 新增 42:Phase A 8 + L1 13 + 周报 5 + capture 7 + triage 5 + cli 集成 4 + Hermes 8)。
+- 版本号全量校验:`grep "0.3"` 跨 8 处清单文件(pyproject/claude-plugin/codex-plugin/openclaw/package.json/hermes plugin.yaml/marketplace.json ×2)无遗留。
+
 ## [0.3.1] - 2026-08-04
 
 修复 3 个 bug + 改进 `garden init` 安装前置(`pyproject.toml` 缺 build-system 导致 `pip install -e .` 失败)。

@@ -10,6 +10,10 @@ from .gitutil import Git
 from .audit import audit
 from .proposal import emit_proposals
 from .apply import apply_approved
+from .l1_apply import apply_l1
+from .weekly_report import summarize as summarize_report, publish as publish_report
+from .capture import run_capture
+from .triage import suggest as triage_suggestions
 from .init_orchestrator import run_init, COMPLETED, NEEDS_OAUTH
 from .init_notion import NotionBootstrapError
 from .init_plugins import install_instructions
@@ -70,6 +74,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("weekly-audit")
     sub.add_parser("apply-approved")
     sub.add_parser("triage-inbox")
+    sub.add_parser("review-orphans")
+    cap_p = sub.add_parser("capture", help="手机/手动随手记 → 路由 Raw 或 Notion Task")
+    cap_p.add_argument("--text", required=True, help="随手记文本")
+    cap_p.add_argument("--source", default="manual", help="来源(manual/web/...)")
 
     init_p = sub.add_parser("init", help="引导知识花园(vault+Notion+插件清单)")
     # init 有独立的 --vault/--config(init 是创建 config,不读取),故在此子命令重新声明
@@ -107,7 +115,33 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "triage-inbox":
         rep = audit(vault)
-        print(f"{len(rep.inbox_pending)} inbox items pending triage")
+        suggestions = triage_suggestions(vault)
+        print(f"{len(rep.inbox_pending)} inbox items pending triage:")
+        for s in suggestions:
+            print(f"  [{s.action}] {s.inbox_rel} — {s.suggestion}")
+        return 0
+
+    if args.cmd == "capture":
+        # capture 不强制 config(离线可落 Raw);有 config 才建 client 供 Task 路径。
+        # 与 weekly-audit/apply-approved 不同:config 缺失不阻断,降级为仅 Raw。
+        cap_client = None
+        try:
+            cap_cfg = load_config(config_path)
+            cap_client = NotionClient(
+                cap_cfg.notion["mcp_endpoint"],
+                cap_cfg.notion["proposal_database_id"],
+                cap_cfg.notion["projects_database_id"],
+                tasks_db=cap_cfg.notion.get("tasks_database_id", ""),
+            )
+        except FileNotFoundError:
+            pass  # 无 config → 只落 Raw(正常路径,不警告)
+        except Exception as e:
+            print(f"warn: config 加载失败,capture 仅落 Raw({e})", file=sys.stderr)
+        res = run_capture(vault, args.text, source=args.source, client=cap_client)
+        line = f"captured → {res.destination}: {res.path_or_id}"
+        if res.note:
+            line += f" ({res.note})"
+        print(line)
         return 0
 
     # weekly-audit / apply-approved 路径:必须先 load_config
@@ -123,6 +157,8 @@ def main(argv: list[str] | None = None) -> int:
         cfg.notion["mcp_endpoint"],
         cfg.notion["proposal_database_id"],
         cfg.notion["projects_database_id"],
+        tasks_db=cfg.notion.get("tasks_database_id", ""),
+        weekly_db=cfg.notion.get("weekly_database_id", ""),
     )
 
     if args.cmd == "weekly-audit":
@@ -141,8 +177,20 @@ def main(argv: list[str] | None = None) -> int:
             # proposal.py 里已经各自 _stash_locally,但万一 init 连接时直接挂
             # (endpoint 完全不可达 → SSL/Protocol/Timeout 异常),必须 catch 住。
             print(f"warn: Notion 不可达(weekly-audit 降级本地暂存): {e}", file=sys.stderr)
+        # L1 自动 apply(本轮自动,无需 Notion 凭证;写 Evergreen + commit)
+        l1 = apply_l1(cfg, vault, git, actor=args.actor,
+                      batch_max=cfg.thresholds.get("batch_l1_max", 50))
+        # 周报(本地 _Reports 始终写 + Notion 周报队列,失败降级)
+        try:
+            projects = client.query_projects_activity()
+        except (httpx.HTTPError, httpx.RequestError) as e:
+            print(f"warn: Projects 活动查询失败,周报用空数据({e})", file=sys.stderr)
+            projects = []
+        stats = summarize_report(vault, rep, projects)
+        publish_report(vault, client, stats)
         print(f"audit done: {len(rep.orphans)} orphans, {len(rep.stale)} stale, "
-              f"{len(rep.inbox_pending)} inbox")
+              f"{len(rep.inbox_pending)} inbox; L1 backfill={l1.backfilled} "
+              f"link={l1.linked} tag={l1.tagged}; 周报 {stats.week}")
         return 0
 
     if args.cmd == "apply-approved":
@@ -159,6 +207,19 @@ def main(argv: list[str] | None = None) -> int:
             print("=" * 60, file=sys.stderr)
             return 4
         print(f"applied {len(res.applied)}, blocked {len(res.blocked)}")
+        return 0
+
+    if args.cmd == "review-orphans":
+        # 只读审计孤岛 + 生成补链提案入 Notion。不写 Evergreen(只产 L2 link 提案)。
+        rep = audit(vault, orphan_age_days=cfg.thresholds["orphan_age_days"])
+        try:
+            emit_proposals(vault, client, rep, actor=args.actor)
+        except (httpx.HTTPError, httpx.RequestError) as e:
+            print(f"warn: Notion 不可达(review-orphans 降级本地暂存): {e}",
+                  file=sys.stderr)
+        for o in rep.orphans:
+            print(f"  orphan: {o}")
+        print(f"{len(rep.orphans)} orphans reviewed,补链提案已入 Notion(若可达)")
         return 0
     return 1
 

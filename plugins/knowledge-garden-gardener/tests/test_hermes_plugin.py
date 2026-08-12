@@ -60,16 +60,37 @@ def test_build_command_minimal():
     assert cmd == ["garden", "triage-inbox"]
 
 
+# ---- review-orphans / capture(新增动词) ----
+
+def test_build_command_review_orphans():
+    cmd = tools.build_command("review-orphans", {"vault": "./G", "config": "c.yaml"})
+    assert cmd == ["garden", "--vault", "./G", "--config", "c.yaml", "review-orphans"]
+
+
+def test_build_command_capture_with_text():
+    cmd = tools.build_command("capture", {"text": "明天开会"})
+    # --text 是子命令参数,在 verb 之后
+    assert cmd == ["garden", "capture", "--text", "明天开会"]
+
+
+def test_build_command_capture_with_vault_and_source():
+    cmd = tools.build_command("capture", {"vault": "./G", "text": "x", "source": "web"})
+    assert "--vault" in cmd and "./G" in cmd
+    assert cmd.index("capture") < cmd.index("--text")  # verb 在 --text 前
+    assert "--source" in cmd and "web" in cmd
+
+
 # ---- register(ctx) 注册(对齐真实 API) ----
 
-def test_register_registers_4_tools_and_1_cli_command():
+def test_register_registers_6_tools_and_1_cli_command():
     ctx = MagicMock()
     garden.register(ctx)
-    # 4 个 tool(register_tool)
-    assert ctx.register_tool.call_count == 4
+    # 6 个 tool(register_tool)
+    assert ctx.register_tool.call_count == 6
     tool_names = {c.kwargs["name"] for c in ctx.register_tool.call_args_list}
     assert tool_names == {"garden_init", "garden_weekly_audit",
-                          "garden_apply_approved", "garden_triage_inbox"}
+                          "garden_apply_approved", "garden_triage_inbox",
+                          "garden_review_orphans", "garden_capture"}
     # 所有 tool 都在 garden toolset 且带 emoji
     for c in ctx.register_tool.call_args_list:
         assert c.kwargs["toolset"] == "garden"
@@ -115,6 +136,28 @@ def test_cli_handler_unknown_verb():
     assert "未知子命令" in cli.garden_command(ns)
 
 
+def test_cli_setup_fn_includes_new_verbs():
+    parser = argparse.ArgumentParser(prog="hermes garden")
+    cli.register_cli(parser)
+    # review-orphans 走通用分支
+    ns = parser.parse_args(["review-orphans", "--vault", "./G"])
+    assert ns.garden_command == "review-orphans"
+    # capture 需 --text
+    ns2 = parser.parse_args(["capture", "--text", "hi"])
+    assert ns2.garden_command == "capture"
+    assert ns2.text == "hi"
+
+
+def test_cli_handler_routes_capture():
+    ns = argparse.Namespace(garden_command="capture", vault=None, config=None,
+                            text="明天要完成周报", source=None)
+    result = cli.garden_command(ns)
+    data = json.loads(result)
+    # garden 不存在 → error JSON(不 raise),但命令拼装含 --text
+    assert "--text" in data["command"]
+    assert "明天要完成周报" in data["command"]
+
+
 # ---- handler 不 raise(garden 不存在时返回 error JSON) ----
 
 def test_handler_returns_error_json_when_garden_missing(monkeypatch):
@@ -134,11 +177,13 @@ def test_plugin_yaml_exists_and_valid():
     assert p.exists()
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     assert data["name"] == "garden"
-    assert data["version"] == "0.3.1"
+    assert data["version"] == "0.4.0"
     assert data["kind"] == "standalone"
     assert "windows" in data["platforms"]  # 本机是 Windows,必须支持
     assert "garden_init" in data["provides_tools"]
-    assert len(data["provides_tools"]) == 4
+    assert "garden_review_orphans" in data["provides_tools"]
+    assert "garden_capture" in data["provides_tools"]
+    assert len(data["provides_tools"]) == 6
 
 
 # ---- schemas 参数对齐真实 CLI(无虚构 --path) ----
@@ -150,3 +195,31 @@ def test_schemas_use_real_cli_params():
     assert "vault" in schemas.WEEKLY_AUDIT["parameters"]["properties"]
     assert "actor" in schemas.APPLY_APPROVED["parameters"]["properties"]
     assert "mcp_endpoint" in schemas.INIT["parameters"]["properties"]
+
+
+def test_schemas_capture_has_required_text():
+    assert "text" in schemas.CAPTURE["parameters"]["properties"]
+    assert schemas.CAPTURE["parameters"]["required"] == ["text"]
+    # ALL 含全部 6 个
+    names = {s["name"] for s in schemas.ALL}
+    assert "garden_capture" in names
+    assert "garden_review_orphans" in names
+    assert len(schemas.ALL) == 6
+
+
+def test_handler_capture_does_not_raise(monkeypatch):
+    def fake_run(*a, **k):
+        raise FileNotFoundError("garden not found")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    result = tools.garden_capture({"text": "x"})
+    data = json.loads(result)
+    assert data["ok"] is False  # 不 raise,返回 error JSON
+
+
+def test_handler_review_orphans_does_not_raise(monkeypatch):
+    def fake_run(*a, **k):
+        raise FileNotFoundError("garden not found")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    result = tools.garden_review_orphans({"vault": "./G"})
+    data = json.loads(result)
+    assert data["ok"] is False

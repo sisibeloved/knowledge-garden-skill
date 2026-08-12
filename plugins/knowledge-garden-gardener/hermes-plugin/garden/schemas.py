@@ -79,7 +79,7 @@ APPLY_APPROVED = {
 TRIAGE_INBOX = {
     "name": "garden_triage_inbox",
     "description": (
-        "整理 Inbox:列出 _System/_Inbox/ 待处理 Raw。只读,安全。"
+        "整理 Inbox:列出 _System/_Inbox/ 待处理 Raw + 每条归类建议。只读,安全。"
         "包装 `garden triage-inbox`。"
     ),
     "parameters": {
@@ -89,4 +89,42 @@ TRIAGE_INBOX = {
     },
 }
 
-ALL = [INIT, WEEKLY_AUDIT, APPLY_APPROVED, TRIAGE_INBOX]
+REVIEW_ORPHANS = {
+    "name": "garden_review_orphans",
+    "description": (
+        "找孤岛笔记(无 links/无反向链接/较老)+ 生成补链提案入 Notion。"
+        "包装 `garden review-orphans`。只读审计 + 产 L2 link 提案,不写 Evergreen。"
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {"vault": _VAULT, "config": _CONFIG},
+        "required": [],
+    },
+}
+
+CAPTURE = {
+    "name": "garden_capture",
+    "description": (
+        "手机/手动随手记:接收一段文本,路由到 Obsidian Raw Inbox 或 Notion Task。"
+        "包装 `garden capture --text ...`。任务类语义(计划/待办/截止)→ Task,"
+        "其余 → Raw。Task 不可达时降级落 Inbox(type=task_candidate)待下轮提升。"
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "vault": _VAULT,
+            "text": {
+                "type": "string",
+                "description": "随手记文本(必填)",
+            },
+            "source": {
+                "type": "string",
+                "description": "来源(manual/web/...),默认 manual",
+            },
+            "config": _CONFIG,
+        },
+        "required": ["text"],
+    },
+}
+
+ALL = [INIT, WEEKLY_AUDIT, APPLY_APPROVED, TRIAGE_INBOX, REVIEW_ORPHANS, CAPTURE]

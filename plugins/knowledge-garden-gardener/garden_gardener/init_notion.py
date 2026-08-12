@@ -16,7 +16,8 @@ def _multi(name, options):
     return _prop(name, "multi_select", options=[{"name": o} for o in options])
 
 
-# 4 个 Notion 库的 schema(对应 design §3.3 待审核提案 + §4.5.2 Projects/Tasks/Habits)
+# 5 个 Notion 库的 schema(对应 design §3.3 待审核提案 + §4.5.2 Projects/Tasks/Habits
+# + §5.5 周报交互队列)。init 时用这些定义建库。
 NOTION_DATABASES = [
     {
         "title": "Projects",
@@ -69,6 +70,21 @@ NOTION_DATABASES = [
             _prop("applied_commit", "rich_text"),  # 跨系统审计链
         ],
     },
+    {
+        # §5.5 周报交互队列:移动端随手读的"本周知识摘要"。
+        # 与 Projects/Tasks/Habits(项目执行面)是独立的一组交互库。
+        "title": "周报",
+        "properties": [
+            _prop("Name", "title"),
+            _prop("week", "rich_text"),         # 形如 2026-W32
+            _prop("summary", "rich_text"),      # markdown 摘要(≤2000 字符)
+            _prop("orphans_count", "number"),
+            _prop("stale_count", "number"),
+            _prop("new_evergreen_count", "number"),
+            _prop("conflicts", "rich_text"),
+            _prop("generated_at", "date"),
+        ],
+    },
 ]
 
 
@@ -77,7 +93,7 @@ class NotionBootstrapError(Exception):
 
 
 def create_all_databases(client: NotionClient, *, parent_page_id: str) -> dict[str, str]:
-    """在指定 parent page 下创建 4 个库,返回 {库名: database_id}。
+    """在指定 parent page 下创建 5 个库,返回 {库名: database_id}。
 
     失败抛 NotionBootstrapError(不部分建——保持原子性,调用方可清理后重试)。
     """

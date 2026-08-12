@@ -33,3 +33,6 @@ desktop.ini
 .obsidian/plugins/*/data.json
 *.cache
 _Trash/
+
+# ZCode CLI 运行时目录
+.zcode/

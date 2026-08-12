@@ -43,4 +43,6 @@ access:
 notion:
   proposal_database_id: "<填待审核提案库 id>"
   projects_database_id: "<填 Projects 库 id>"
+  tasks_database_id: "<填 Tasks 库 id,capture 路由用;留空则 capture 的 Task 路径降级落 Raw>"
+  weekly_database_id: "<填周报库 id;留空则周报仅写本地 _Reports>"
   mcp_endpoint: "<填 Notion MCP endpoint>"

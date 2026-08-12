@@ -8,3 +8,5 @@ _Trash/
 .garden-init.json
 # Tests:临时样本 / checkpoint 不应入库
 tests/.garden-*
+# capture 运行时误写到 plugin 目录的真实 Raw(模板只保留 .gitkeep)
+_System/_Inbox/raw-*.md

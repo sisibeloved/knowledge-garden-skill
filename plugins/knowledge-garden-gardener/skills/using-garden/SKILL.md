@@ -5,14 +5,16 @@ description: Use when 用户要搭建知识花园、跑巡园审计、应用已�
 
 # Knowledge Garden Gardener(入口 router)
 
-薄 router:理解用户目标,路由到 4 个入口动词。本 plugin 是标准 CLI(`garden`),Agent 通过 shell 调用。
+薄 router:理解用户目标,路由到 5 个入口动词(+ init)。本 plugin 是标准 CLI(`garden`),Agent 通过 shell 调用。
 
 ## 何时用
 
 - 用户首次搭建知识花园 → `init`
-- 用户说"巡园"/"整理知识花园"/"跑审计"/"找孤岛" → `weekly-audit`
+- 用户说"巡园"/"整理知识花园"/"跑审计" → `weekly-audit`(含 L1 自动补链/补字段 + 周报)
 - 用户说"应用已批准的提案"/"执行审批" → `apply-approved`
-- 用户说"整理 Inbox"/"处理原料" → `triage-inbox`
+- 用户说"整理 Inbox"/"处理原料" → `triage-inbox`(含归类建议)
+- 用户说"找孤岛"/"审查孤立笔记"/"补链" → `review-orphans`
+- 用户随手记一条/"记一下"/"捕获这个" → `capture`
 
 ## 前置
 
@@ -30,9 +32,14 @@ garden init --vault <vault> --mcp-endpoint <endpoint> --parent-page <notion-page
 
 **OAuth 是唯一人工断点**:首次跑返回 exit 3 + 指引,完成 Notion OAuth 后带 `--oauth-done` 重跑续上。仅"在 Obsidian GUI 内装插件"这步因 Obsidian 官方 CLI 不支持 `plugin:install` 而需人工(启用清单已自动生成)。
 
-### weekly-audit(只读审计)
+### weekly-audit(只读审计 + L1 自动 apply + 周报)
 
-只读审计 vault(孤岛/过时/Inbox),生成提案写入 Notion「待审核提案」库。**不写 Evergreen**(只产提案)。
+只读审计 vault(孤岛/过时/Inbox),生成 L2 提案入 Notion「待审核提案」库。**不写 Evergreen 结论**(只产 L2 提案),但会**本轮自动执行 L1 低风险写**(无需 Notion 凭证):
+- backfill 缺失 frontmatter(id/created_at/updated_at/status)
+- 关键词补链(正文命中其它 Evergreen 标题 → 加 `[[ ]]` + links 字段)
+- 英文高频词补 tags(仅 tags 为空时;中文分词待二期)
+
+每类 L1 操作各自一个 git commit(`gardener(L1): ...`,可整类 revert),受 `batch_l1_max` 截断。最后生成周报:本地 `_System/_Reports/weekly-report.md`(始终)+ Notion 周报队列(若配置,失败降级)。
 
 ```
 garden --config <vault>/_Config/gardener.config.yaml --vault <vault> weekly-audit
@@ -48,9 +55,28 @@ garden --config <vault>/_Config/gardener.config.yaml --vault <vault> --actor sch
 
 定时/无人值守场景用 `--actor scheduled_run`(能力受限,L3 破坏性操作即便已批准也拒,需人在场)。
 
-### triage-inbox
+### triage-inbox(整理 + 归类建议)
 
-列出 `_System/_Inbox/` 待处理 Raw。
+列出 `_System/_Inbox/` 待处理 Raw,并为每条给出 next step 建议:任务候选(从 capture 降级来的)→ 提升为 Task;含 URL → 晋升 Reference;概念性内容 → 提炼 Evergreen。只读,不写。
+
+### review-orphans(孤岛审查)
+
+只读审计孤岛笔记(无 links + 无反向链接 + 较老),生成补链提案入 Notion「待审核提案」库(L2 link 提案)。比 weekly-audit 聚焦——只看孤岛。不写 Evergreen。
+
+```
+garden --config <vault>/_Config/gardener.config.yaml --vault <vault> review-orphans
+```
+
+### capture(随手记捕获)
+
+接收一段文本(手机/手动),路由到 Obsidian Raw 或 Notion Task。判定:任务语义(计划/待办/截止/deadline/todo 等)→ Task;其余 → Raw。Task 不可达(Notion 配置缺失/不可达)时降级落 Raw Inbox 并标 `type=task_candidate`(下轮 triage 提示提升)。离线也能落 Raw。
+
+```
+garden --vault <vault> capture --text "明天要完成 RAG 综述的笔记"
+garden --vault <vault> capture --text "双链是 Obsidian 核心机制" --source manual
+```
+
+References/Concepts 是 Evergreen(L2 需审批),capture 是 L0 自由写——**不能直接落 Evergreen**,所以"出处/资料/不确定"一律先落 Raw,下轮 triage 提升(设计 §4.5.5)。
 
 ## 红线(不可违反)
 
