@@ -2,7 +2,7 @@
 import httpx
 from garden_gardener.vault import Vault
 from garden_gardener.notion import NotionClient
-from garden_gardener.frontmatter import parse
+from garden_gardener.frontmatter import parse, dump
 from garden_gardener.capture import route, run_capture, capture_to_raw
 
 
@@ -86,3 +86,46 @@ def test_capture_raw_id_unique_for_different_text(vault, force_filesystem):
     capture_to_raw(Vault(vault), "内容二", "manual")
     files = Vault(vault).read_glob("_System/_Inbox/*.md")
     assert len(files) == 2  # 不同文本 → 不同文件名
+
+
+# ---------- ttl 随手记生命周期 ----------
+
+def test_capture_with_ttl_writes_expires_at(vault, force_filesystem):
+    from datetime import date, timedelta
+    res = run_capture(Vault(vault), "临时会议室密码 8848", source="manual",
+                      client=None, ttl_days=7)
+    assert res.destination == "raw"
+    fm, _ = parse(Vault(vault).read(res.path_or_id))
+    expect = (date.today() + timedelta(days=7)).isoformat()
+    assert fm["expires_at"] == expect
+
+
+def test_capture_without_ttl_has_no_expires(vault, force_filesystem):
+    res = run_capture(Vault(vault), "长期有用的想法", client=None)
+    fm, _ = parse(Vault(vault).read(res.path_or_id))
+    assert "expires_at" not in fm
+
+
+def test_archive_expired_inbox_moves_only_expired(vault, force_filesystem):
+    """过期 Raw → _System/_Archive/_Inbox/;未过期/无 expires 的原地不动。"""
+    from datetime import date, timedelta
+    from garden_gardener.gitutil import Git
+    from garden_gardener.l1_apply import archive_expired_inbox
+    v = Vault(vault)
+    old = (date.today() - timedelta(days=1)).isoformat()
+    fresh = (date.today() + timedelta(days=10)).isoformat()
+    v.write("_System/_Inbox/expired.md",
+            dump({"id": "e", "type": "raw", "status": "inbox",
+                  "expires_at": old}, "x"), risk_level="L0")
+    v.write("_System/_Inbox/fresh.md",
+            dump({"id": "f", "type": "raw", "status": "inbox",
+                  "expires_at": fresh}, "x"), risk_level="L0")
+    v.write("_System/_Inbox/keep.md",
+            dump({"id": "k", "type": "raw", "status": "inbox"}, "x"),
+            risk_level="L0")
+    n = archive_expired_inbox(v, Git(vault))
+    assert n == 1
+    assert (vault / "_System/_Archive/_Inbox/expired.md").exists()
+    assert not (vault / "_System/_Inbox/expired.md").exists()
+    assert (vault / "_System/_Inbox/fresh.md").exists()
+    assert (vault / "_System/_Inbox/keep.md").exists()

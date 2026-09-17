@@ -142,7 +142,7 @@ def _count_new_this_week(vault: Vault) -> int:
     """扫 Evergreen created_at,数本周(ISO 周)新增。"""
     week = _week_str()
     count = 0
-    for pat in ("Concepts/*.md", "Notes/*.md"):
+    for pat in ("Concepts/**/*.md", "Notes/**/*.md"):  # 递归:支持多级子目录分类
         for p in vault.read_glob(pat):
             rel = p.relative_to(vault.root).as_posix()
             try:

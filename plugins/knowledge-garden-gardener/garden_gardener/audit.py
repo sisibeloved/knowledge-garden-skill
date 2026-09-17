@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from pathlib import Path
 from .vault import Vault
 from .frontmatter import parse
 
@@ -27,7 +28,7 @@ def audit(vault: Vault, *, orphan_age_days: int = 7, stale_days: int = 90) -> Au
     # 收集所有 Evergreen 笔记 + 反向链接统计
     backlinks: dict[str, int] = {}
     evergreen: list[tuple[str, dict]] = []
-    for glob_pat in ("Concepts/*.md", "Notes/*.md"):
+    for glob_pat in ("Concepts/**/*.md", "Notes/**/*.md"):  # 递归:支持多级子目录分类
         for p in vault.read_glob(glob_pat):
             rel = p.relative_to(vault.root).as_posix()
             fm, _body = parse(vault.read(rel))
@@ -39,7 +40,9 @@ def audit(vault: Vault, *, orphan_age_days: int = 7, stale_days: int = 90) -> Au
     for rel, fm in evergreen:
         links = fm.get("links", []) or []
         title = fm.get("title") or ""
-        has_backlink = backlinks.get(title, 0) > 0
+        stem = Path(rel).stem
+        # 反链按 title 或文件名匹配(双链常用文件名,未必等于 title)
+        has_backlink = backlinks.get(title, 0) > 0 or backlinks.get(stem, 0) > 0
         reviewed = fm.get("last_reviewed_at") or fm.get("created_at")
         is_old = _parse_date(reviewed) <= orphan_cutoff if reviewed else True
         # 孤岛:无 links 且无反向链接 且 较老

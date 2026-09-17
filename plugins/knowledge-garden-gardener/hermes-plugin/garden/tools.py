@@ -45,6 +45,8 @@ def build_command(verb: str, args: dict) -> list[str]:
         cmd += ["--text", args["text"]]
         if args.get("source"):
             cmd += ["--source", args["source"]]
+        if args.get("ttl"):
+            cmd += ["--ttl", str(args["ttl"])]
     return cmd
 
 

@@ -4,6 +4,33 @@
 
 格式基于 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/),版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [0.6.0] - 2026-09-17
+
+真实 vault 迁移(48 篇笔记)后按园主反馈做的三项体验改进:多级分类、提案可读化、随手记生命周期。
+
+### Added
+
+- **Evergreen 支持多级子目录分类**:audit/l1_apply/weekly_report 的扫描 glob 从 `Concepts/*.md` 改为 `Concepts/**/*.md`(`pathlib` `**` 含一级,老 vault 零影响)。笔记可按 `Concepts/Kunpeng/芯片概念/`、`Notes/工作/` 等任意深度组织,不再强制平铺。
+- **提案可读化(移动端审批体验)**:
+  - 提案标题从机器 id(`2026-09-17-001`)改为 `【补链】昇腾产品线(2026-09-17-001)`(action 中文标签 + 展示名 + id 尾缀保留审计链);
+  - `Proposal.detail` 写入 Notion 页面正文段落块:【现状】/【建议】/【摘录】,不打开 vault 即可判断批不批;
+  - 补链提案附**具体建议链接**:复用 L1 `add_wikilink` 同一套标题匹配(新增公开 `suggest_wikilinks`),diff 从"待智能匹配"占位文案变为 `建议补链:[[X]]、[[Y]]`;无匹配时明说"需人工判断"且 confidence 降至 0.4。
+- **随手记生命周期(TTL)**:`garden capture --ttl 7` 写入 `expires_at` frontmatter;`weekly-audit` 新增 `archive_expired_inbox`(L1)把过期 Raw 移入 `_System/_Archive/_Inbox/`(归档不删除)。临时口令/会议室密码/短期备忘不再堆积 Inbox。
+- **`NotionClient.archive_page`**:归档代替删除(红线一致),用于清理已过时提案。
+- **暂存提案回放(`replay_pending`)**:设计 §错误恢复承诺的"Notion 不可达暂存 `_PendingProposals/`,下轮补写"此前没有实现代码。现在 emit_proposals 开头自动回放:查询库内 pending target 去重 + 本轮将生成的目标跳过(防重复),写成功删本地副本,失败留待下轮。
+- **提案防重复生成**:emit_proposals 先查库内 pending 提案的 target——已有 pending 的孤岛本轮跳过(否则每周 audit 给同一批未审批孤岛堆重复提案)。不可达时照常生成(失败暂存,下轮回放去重)。
+- **反链按文件名匹配(审计修复)**:`[[refinement]]` 这类"文件名 ≠ title"的双链此前不构成反链,被指向笔记被误判孤岛。现在 backlink 按 title 或文件名 stem 双查。
+
+### Changed
+
+- `proposal._from_audit` 签名 `(rep)` → `(vault, rep)`(需要读笔记正文算建议);`emit_proposals` 对外签名不变。
+- `run_capture`/`capture_to_raw` 增可选 `ttl_days` 参数;Hermes 包装 capture 同步 `ttl` 参数。
+
+### Verified
+
+- `pytest tests/ -q` → **148 passed**(+15:嵌套目录审计/提案建议/无匹配降档/坏文件降级/标题断言/children/archive_page/TTL 写入/无 TTL/过期归档/回放×5/文件名反链/pending 防重复)。
+- 真机:vault 多级重组后 weekly-audit 正常;15 条旧不可读提案已归档,重新生成的新提案带建议链接与详情块。
+
 ## [0.5.0] - 2026-09-17
 
 **Notion 传输层从未经真机验证的 REST 风格 mock 改为真 Notion 官方 REST API**(internal integration token 认证)。这是打通真实 Notion 的关键一步:此前 `POST {endpoint}/{tool}` 契约既不兼容官方 hosted MCP(JSON-RPC 单端点)也不兼容官方 REST API,`garden init` 从未在真实工作区建库成功过。

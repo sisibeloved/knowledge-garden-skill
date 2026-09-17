@@ -11,7 +11,7 @@ from .gitutil import Git
 from .audit import audit
 from .proposal import emit_proposals
 from .apply import apply_approved
-from .l1_apply import apply_l1
+from .l1_apply import apply_l1, archive_expired_inbox
 from .weekly_report import summarize as summarize_report, publish as publish_report
 from .capture import run_capture
 from .triage import suggest as triage_suggestions
@@ -133,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
     cap_p = sub.add_parser("capture", help="手机/手动随手记 → 路由 Raw 或 Notion Task")
     cap_p.add_argument("--text", required=True, help="随手记文本")
     cap_p.add_argument("--source", default="manual", help="来源(manual/web/...)")
+    cap_p.add_argument("--ttl", type=int, default=None,
+                       help="有效期(天);过期后 weekly-audit 自动归档该随手记")
 
     init_p = sub.add_parser("init", help="引导知识花园(vault+Notion+插件清单)")
     # init 有独立的 --vault/--config(init 是创建 config,不读取),故在此子命令重新声明
@@ -193,7 +195,8 @@ def main(argv: list[str] | None = None) -> int:
             pass  # 无 config → 只落 Raw(正常路径,不警告)
         except Exception as e:
             print(f"warn: config 加载失败,capture 仅落 Raw({e})", file=sys.stderr)
-        res = run_capture(vault, args.text, source=args.source, client=cap_client)
+        res = run_capture(vault, args.text, source=args.source,
+                          client=cap_client, ttl_days=args.ttl)
         line = f"captured → {res.destination}: {res.path_or_id}"
         if res.note:
             line += f" ({res.note})"
@@ -230,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
         # L1 自动 apply(本轮自动,无需 Notion 凭证;写 Evergreen + commit)
         l1 = apply_l1(cfg, vault, git, actor=args.actor,
                       batch_max=cfg.thresholds.get("batch_l1_max", 50))
+        expired = archive_expired_inbox(vault, git)
         # 周报(本地 _Reports 始终写 + Notion 周报队列,失败降级)
         try:
             projects = client.query_projects_activity()
@@ -240,7 +244,7 @@ def main(argv: list[str] | None = None) -> int:
         publish_report(vault, client, stats)
         print(f"audit done: {len(rep.orphans)} orphans, {len(rep.stale)} stale, "
               f"{len(rep.inbox_pending)} inbox; L1 backfill={l1.backfilled} "
-              f"link={l1.linked} tag={l1.tagged}; 周报 {stats.week}")
+              f"link={l1.linked} tag={l1.tagged}; expired_inbox={expired}; 周报 {stats.week}")
         return 0
 
     if args.cmd == "apply-approved":

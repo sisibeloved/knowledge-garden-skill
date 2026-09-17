@@ -1,6 +1,6 @@
 # 🌿 知识花园园丁
 
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#安装)
 [![Codex](https://img.shields.io/badge/Codex-plugin-0A7EA4.svg)](#安装)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-bundle-8A2BE2.svg)](#安装)
@@ -137,7 +137,7 @@ cd plugins/knowledge-garden-gardener
 python -m pytest -v
 ```
 
-当前:131 tests pass,覆盖 config/risk/frontmatter/vault/gitutil/notion/audit/proposal/apply/capture/triage/init 全模块(含 Notion REST wire 契约)。
+当前:141 tests pass,覆盖 config/risk/frontmatter/vault/gitutil/notion/audit/proposal/apply/capture/triage/init 全模块(含 Notion REST wire 契约 + 多级目录/提案可读化/TTL 生命周期)。
 
 ## 📚 文档
 

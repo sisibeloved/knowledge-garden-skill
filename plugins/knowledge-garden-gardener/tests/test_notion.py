@@ -49,21 +49,55 @@ def test_create_proposal_posts_typed_properties():
         return {"id": "page-1", "url": "https://notion.so/page-1"}
 
     client = _mkclient(send=fake_send)
-    pid = client.create_proposal(Proposal(
+    p = Proposal(
         proposal_id="2026-06-28-001", risk="L2", action="create",
         target="Concepts/X.md", sources=["raw-1", "raw-2"],
-        confidence=0.8, diff="+ new"))
+        confidence=0.8, diff="+ new",
+        detail="【现状】《X》是孤岛。\n【建议】补链:[[Y]]")
+    pid = client.create_proposal(p)
     assert pid == "page-1"
     method, path, payload = calls[0]
     assert (method, path) == ("POST", "/pages")
     assert payload["parent"] == {"database_id": "db-1"}
     props = payload["properties"]
-    assert props["proposal_id"] == {"title": [{"text": {"content": "2026-06-28-001"}}]}
+    # 标题人类可读:【action】目标名(proposal_id),id 尾部保留可追溯
+    assert props["proposal_id"]["title"][0]["text"]["content"] == \
+        "【新建】X(2026-06-28-001)"
     assert props["risk"] == {"select": {"name": "L2"}}
     assert props["action"] == {"select": {"name": "create"}}
     assert props["status"] == {"select": {"name": "pending"}}  # 新提案必为 pending
     assert props["confidence"] == {"number": 0.8}
     assert props["sources"]["rich_text"][0]["text"]["content"] == "raw-1,raw-2"
+    # detail 写入页面正文(移动端点开即知审什么)
+    blocks = payload.get("children", [])
+    assert [b["paragraph"]["rich_text"][0]["text"]["content"] for b in blocks] == \
+        ["【现状】《X》是孤岛。", "【建议】补链:[[Y]]"]
+
+
+def test_create_proposal_without_detail_has_no_children():
+    calls = []
+
+    def fake_send(method, path, json=None):
+        calls.append((method, path, json))
+        return {"id": "page-2"}
+
+    client = _mkclient(send=fake_send)
+    client.create_proposal(Proposal(
+        proposal_id="001", risk="L2", action="link", target="Concepts/Y.md",
+        sources=[], confidence=0.5, diff="d"))
+    assert "children" not in calls[0][2]
+
+
+def test_archive_page_patches_archived_flag():
+    calls = []
+
+    def fake_send(method, path, json=None):
+        calls.append((method, path, json))
+        return {"id": "p1"}
+
+    client = _mkclient(send=fake_send)
+    client.archive_page("p1")
+    assert calls[0] == ("PATCH", "/pages/p1", {"archived": True})
 
 
 # ---------- poll_approved ----------

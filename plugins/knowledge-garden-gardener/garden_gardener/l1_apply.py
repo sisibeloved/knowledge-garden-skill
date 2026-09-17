@@ -99,7 +99,7 @@ def apply_l1(cfg: Config, vault: Vault, git: Git, *,
 def _load_evergreen(vault: Vault) -> list[tuple[str, dict, str]]:
     """读入 Concepts/*.md + Notes/*.md,返回 [(rel, fm, body)]。"""
     out = []
-    for pat in ("Concepts/*.md", "Notes/*.md"):
+    for pat in ("Concepts/**/*.md", "Notes/**/*.md"):  # 递归:支持多级子目录分类
         for p in vault.read_glob(pat):
             rel = p.relative_to(vault.root).as_posix()
             fm, body = parse(vault.read(rel))
@@ -159,6 +159,49 @@ def _find_links(body: str, current_title, titles: set,
 
 def _strip_link(l) -> str:
     return str(l).strip().strip("[]").strip()
+
+
+def suggest_wikilinks(body: str, title: str, titles: set[str],
+                      existing_links=None) -> list[str]:
+    """公开补链建议:正文命中哪些 Evergreen 标题(提案生成复用同一套匹配)。
+
+    与 apply_l1 的 add_wikilink 走同一个 _find_links,保证"提案里建议的
+    链接"与"批准后自动补的链接"一致。
+    """
+    return _find_links(body, title, titles, existing_links or [])
+
+
+def archive_expired_inbox(vault: Vault, git: Git) -> int:
+    """归档已过期的随手记:_System/_Inbox 里 expires_at 早于今天的 → _Archive/_Inbox。
+
+    capture --ttl N 写入 expires_at;过期 Raw 移入 _System/_Archive/_Inbox/
+    (不删除,归档可翻)。一个 L1 commit,返回归档条数。
+    """
+    from datetime import date
+    import shutil
+    today = date.today()
+    moved: list[str] = []
+    for p in vault.read_glob("_System/_Inbox/*.md"):
+        rel = p.relative_to(vault.root).as_posix()
+        try:
+            fm, _ = parse(vault.read(rel))
+        except Exception:
+            continue
+        exp = fm.get("expires_at")
+        if not exp:
+            continue
+        try:
+            if date.fromisoformat(str(exp)[:10]) >= today:
+                continue
+        except ValueError:
+            continue
+        dst = vault.root / "_System/_Archive/_Inbox" / p.name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(p), str(dst))
+        moved.append(rel)
+    if moved:
+        git.commit_all("L1", f"archive {len(moved)} expired inbox items")
+    return len(moved)
 
 
 def _word_in_body(body: str, title: str) -> bool:

@@ -1,6 +1,6 @@
 {
   "name": "knowledge-garden-gardener",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "知识花园园丁:只读审计 Obsidian vault、生成提案入 Notion、轮询已批准提案 apply 到 Evergreen、L1 自动补链/补字段、周报、孤岛审查、随手记捕获。Agent 当园丁,人定稿。",
   "author": {
     "name": "luchen"

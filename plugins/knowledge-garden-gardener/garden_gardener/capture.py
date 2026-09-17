@@ -48,10 +48,13 @@ def route(text: str) -> str:
 
 def run_capture(vault: Vault, text: str, *,
                 source: str = "manual",
-                client: NotionClient | None = None) -> CaptureResult:
+                client: NotionClient | None = None,
+                ttl_days: int | None = None) -> CaptureResult:
     """编排:route → 落地。Task 路径失败降级为 Raw(task_candidate)。
 
     client=None(无 config/离线)时,task 路径直接降级 Raw。capture 始终能落 Raw。
+    ttl_days:随手记有效期(天);过期的 Raw 由 weekly-audit 自动归档到
+    _System/_Archive/_Inbox/,不删除。
     """
     dest = route(text)
 
@@ -68,17 +71,19 @@ def run_capture(vault: Vault, text: str, *,
         return CaptureResult("raw_fallback", path,
                              "Task 不可用,落 Inbox(type=task_candidate)待下轮提升")
 
-    path = capture_to_raw(vault, text, source)
+    path = capture_to_raw(vault, text, source, ttl_days=ttl_days)
     return CaptureResult("raw", path)
 
 
 def capture_to_raw(vault: Vault, text: str, source: str,
-                   *, raw_type: str = "raw") -> str:
+                   *, raw_type: str = "raw", ttl_days: int | None = None) -> str:
     """写一条 Raw 到 _System/_Inbox,返回 vault 相对路径。
 
     raw_type: "raw"(普通)或 "task_candidate"(从 Task 降级,下轮 triage 提升)。
+    ttl_days: 有效期;到期后 weekly-audit 归档(随手记不堆积)。
     frontmatter 遵循设计 §3.3 Raw schema。
     """
+    from datetime import date, timedelta
     raw_id = _raw_id(text)
     rel = f"{_INBOX_DIR}/{raw_id}.md"
     fm = {
@@ -92,6 +97,8 @@ def capture_to_raw(vault: Vault, text: str, source: str,
         "needs_review": raw_type == "task_candidate",
         "tags": [],
     }
+    if ttl_days is not None and ttl_days > 0:
+        fm["expires_at"] = (date.today() + timedelta(days=ttl_days)).isoformat()
     vault.write(rel, dump(fm, text), risk_level="L0")
     return rel
 

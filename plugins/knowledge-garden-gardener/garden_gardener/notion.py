@@ -34,6 +34,26 @@ class Proposal:
     sources: list[str]   # 来源 Raw id 列表
     confidence: float
     diff: str
+    detail: str = ""     # 给园主看的说明(写入 Notion 页面正文)
+    display: str = ""    # 展示名(缺省用 target 文件名;提案标题用)
+
+
+# 提案标题的 action 中文标签(移动端列表一眼可读)
+_ACTION_LABELS = {
+    "link": "补链", "create": "新建", "update": "改结论",
+    "delete": "删除", "move": "移动", "rename": "重命名",
+}
+
+
+def proposal_title(p: "Proposal") -> str:
+    """提案在 Notion 列表里的展示标题:【补链】昇腾产品线 (2026-09-17-001)。
+
+    proposal_id 保留在尾部,apply 的审计链(commit message/fm id)仍可追溯。
+    """
+    from pathlib import PurePosixPath
+    stem = p.display or (PurePosixPath(p.target).stem or p.target)
+    label = _ACTION_LABELS.get(p.action, p.action)
+    return f"【{label}】{stem}({p.proposal_id})"
 
 
 class NotionConfigError(Exception):
@@ -80,6 +100,12 @@ def date_value(d: str | None) -> dict:
 
 def url_value(u: str) -> dict:
     return {"url": u}
+
+
+def _para(text: str) -> dict:
+    """Notion 段落块(页面正文 children 用)。"""
+    return {"object": "block", "type": "paragraph",
+            "paragraph": {"rich_text": [{"text": {"content": (text or "")[:2000]}}]}}
 
 
 # ---------- 属性值归一化(Notion 类型化属性 → 业务侧扁平值) ----------
@@ -172,9 +198,13 @@ class NotionClient:
     # ---- 业务操作(扁平属性进出) ----
 
     def create_proposal(self, p: Proposal) -> str:
-        """新建一条 pending 提案,返回 Notion page id。"""
+        """新建一条 pending 提案,返回 Notion page id。
+
+        标题用人类可读格式(proposal_title);detail 写入页面正文段落块,
+        移动端点开即知要审什么(现状/建议/摘录),不用回 vault 翻文件。
+        """
         props = {
-            "proposal_id": title_value(p.proposal_id),
+            "proposal_id": title_value(proposal_title(p)),
             "created_at": date_value(date.today().isoformat()),
             "status": select_value("pending"),
             "risk": select_value(p.risk),
@@ -184,11 +214,19 @@ class NotionClient:
             "confidence": number_value(p.confidence),
             "diff": rich_text_value(p.diff),
         }
-        resp = self._send("POST", "/pages", {
+        payload = {
             "parent": {"database_id": self.proposal_db},
             "properties": props,
-        })
+        }
+        if p.detail:
+            payload["children"] = [_para(line) for line in
+                                   p.detail.splitlines() if line.strip()]
+        resp = self._send("POST", "/pages", payload)
         return resp["id"]
+
+    def archive_page(self, page_id: str) -> None:
+        """归档页面(红线:Notion 侧永不删除,清理一律用归档)。"""
+        self._send("PATCH", f"/pages/{page_id}", {"archived": True})
 
     def poll_approved(self) -> list[dict]:
         """轮询 status=approved 的提案,返回 [{id, properties(扁平)}]。

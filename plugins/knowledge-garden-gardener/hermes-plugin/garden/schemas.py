@@ -127,6 +127,10 @@ CAPTURE = {
                 "description": "来源(manual/web/...),默认 manual",
             },
             "config": _CONFIG,
+            "ttl": {
+                "type": "integer",
+                "description": "有效期(天);过期后 weekly-audit 自动归档。短期速记(如临时 IP/口令/会议时间)建议 7",
+            },
         },
         "required": ["text"],
     },

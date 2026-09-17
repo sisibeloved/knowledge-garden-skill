@@ -44,6 +44,7 @@ def register_cli(subparser: argparse.ArgumentParser) -> None:
     cap_p.add_argument("--config", default=None, help="gardener.config.yaml 路径(可选)")
     cap_p.add_argument("--text", required=True, help="随手记文本")
     cap_p.add_argument("--source", default=None, help="来源(manual/web/...)")
+    cap_p.add_argument("--ttl", type=int, default=None, help="有效期(天),过期自动归档")
 
 
 def garden_command(args: argparse.Namespace) -> str:
@@ -74,6 +75,8 @@ def garden_command(args: argparse.Namespace) -> str:
         tool_args["text"] = args.text
     if getattr(args, "source", None):
         tool_args["source"] = args.source
+    if getattr(args, "ttl", None):
+        tool_args["ttl"] = args.ttl
 
     handler = tools.HANDLERS[verb]
     return handler(tool_args)
