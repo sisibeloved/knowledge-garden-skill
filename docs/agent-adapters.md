@@ -18,7 +18,7 @@
 
 ```bash
 pip install -e .  # 让 garden 命令可用
-garden init --vault ./Garden --mcp-endpoint <endpoint> --parent-page <page-id>
+garden init --vault ./Garden --parent-page <notion页面URL或page-id>
 ```
 
 ---
@@ -70,7 +70,7 @@ hermes  # 启动后 garden tool 和 hermes garden 子命令可用
 
 **使用**:
 - LLM 自主:`garden_weekly_audit` 等 tool(模型按 schema 决定何时调)
-- 手动:`hermes garden weekly-audit --vault ./Garden`、`hermes garden init --mcp-endpoint <ep> --parent-page <pp>`
+- 手动:`hermes garden weekly-audit --vault ./Garden`、`hermes garden init --parent-page <pp> [--auth-done]`
 
 **定时**:用 Hermes 内置 [cron scheduler](https://hermes-agent.nousresearch.com/docs/user-guide/features/cron),job 的 prompt 让 agent 调 garden tool。([Build a Hermes Plugin](https://hermes-agent.nousresearch.com/docs/guides/build-a-hermes-plugin))
 

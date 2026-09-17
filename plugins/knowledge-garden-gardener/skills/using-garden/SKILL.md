@@ -24,13 +24,13 @@ description: Use when 用户要搭建知识花园、跑巡园审计、应用已�
 
 ### init(首次引导,可断点续跑)
 
-引导整个知识花园:自动建 vault 骨架 + .gitignore、调 Notion MCP 建 4 个库(Projects/Tasks/Habits/待审核提案)、把 database id 填回 config、生成 Obsidian 插件启用清单。
+引导整个知识花园:自动建 vault 骨架 + .gitignore、调 Notion 官方 REST API 建 5 个库(Projects/Tasks/Habits/待审核提案/周报)、把 database id 填回 config、生成 Obsidian 插件启用清单。
 
 ```
-garden init --vault <vault> --mcp-endpoint <endpoint> --parent-page <notion-page-id>
+garden init --vault <vault> --parent-page <notion页面URL或page-id>
 ```
 
-**OAuth 是唯一人工断点**:首次跑返回 exit 3 + 指引,完成 Notion OAuth 后带 `--oauth-done` 重跑续上。仅"在 Obsidian GUI 内装插件"这步因 Obsidian 官方 CLI 不支持 `plugin:install` 而需人工(启用清单已自动生成)。
+**integration token 授权是唯一人工断点**:首次跑返回 exit 3 + 指引(建 integration → 设 `NOTION_TOKEN` 环境变量 → 父页面 ··· → Connections 分享给它),完成后带 `--auth-done` 重跑续上。仅"在 Obsidian GUI 内装插件"这步因 Obsidian 官方 CLI 不支持 `plugin:install` 而需人工(启用清单已自动生成)。
 
 ### weekly-audit(只读审计 + L1 自动 apply + 周报)
 

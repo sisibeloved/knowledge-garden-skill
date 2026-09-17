@@ -16,28 +16,33 @@ _CONFIG = {
 INIT = {
     "name": "garden_init",
     "description": (
-        "首次引导知识花园:自动建 vault 骨架 + Notion 4 库 + 插件清单。"
+        "首次引导知识花园:自动建 vault 骨架 + Notion 5 库 + 插件清单。"
         "包装 `garden init`。用户首次搭建时用。"
-        "OAuth 是唯一人工断点:首次跑返回 exit 3,完成 Notion OAuth 后带 oauth_done=true 重跑。"
+        "Notion 授权是唯一人工断点:首次跑返回 exit 3,完成 integration token"
+        "配置 + 父页面分享后带 auth_done=true 重跑。"
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "vault": _VAULT,
-            "mcp_endpoint": {
-                "type": "string",
-                "description": "Notion MCP endpoint(必填)",
-            },
             "parent_page": {
                 "type": "string",
-                "description": "Notion 父页面 id,4 个库建在其下(必填)",
+                "description": "Notion 父页面 URL 或 page id,5 个库建在其下(必填)",
             },
-            "oauth_done": {
+            "api_base": {
+                "type": "string",
+                "description": "Notion REST API base(默认官方 https://api.notion.com/v1)",
+            },
+            "token_env": {
+                "type": "string",
+                "description": "读 Notion token 的环境变量名(默认 NOTION_TOKEN)",
+            },
+            "auth_done": {
                 "type": "boolean",
-                "description": "已完成 Notion OAuth(首次跑 false,断点后续跑 true)",
+                "description": "已完成 integration token 配置 + 父页面分享(断点后续跑 true)",
             },
         },
-        "required": ["mcp_endpoint", "parent_page"],
+        "required": ["parent_page"],
     },
 }
 

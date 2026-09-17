@@ -23,21 +23,33 @@ def _cfg() -> Config:
     )
 
 
+def _sel(name):
+    return {"select": {"name": name}}
+
+
+def _rt(s):
+    return {"rich_text": [{"text": {"content": s}, "plain_text": s}]}
+
+
+def _ttl(s):
+    return {"title": [{"text": {"content": s}, "plain_text": s}]}
+
+
 def test_apply_create_writes_and_commits_and_writeback(vault, force_filesystem):
-    # 模拟 Notion 返回一条 approved 的 create 提案
-    def fake_post(tool, payload):
-        if tool == "query_database":
+    # 模拟 Notion 返回一条 approved 的 create 提案(Notion 原生类型化属性)
+    def fake_send(method, path, json=None):
+        if path == "/databases/db-1/query":
             return {"results": [{
                 "id": "p1",
-                "properties": {"proposal_id": "001", "risk": "L2", "action": "create",
-                               "target": "Concepts/New.md", "sources": "",
-                               "confidence": 0.9, "diff": "# New\nbody",
-                               "status": "approved"}}]}
-        if tool == "update_page":
-            return {"ok": True}
-        return {}
+                "properties": {"proposal_id": _ttl("001"), "risk": _sel("L2"),
+                               "action": _sel("create"),
+                               "target": _rt("Concepts/New.md"), "sources": _rt(""),
+                               "confidence": {"number": 0.9},
+                               "diff": _rt("# New\nbody"),
+                               "status": _sel("approved")}}]}
+        return {"id": "p1"}
 
-    client = NotionClient("http://mcp", "db-1", "db-2", post=fake_post)
+    client = NotionClient(proposal_db="db-1", projects_db="db-2", send=fake_send)
     v = Vault(vault)
     git = Git(vault)
     result = apply_approved(_cfg(), v, client, git, actor="manual_session")
@@ -51,16 +63,17 @@ def test_apply_create_writes_and_commits_and_writeback(vault, force_filesystem):
 
 def test_apply_blocked_when_l3_on_scheduled(vault, force_filesystem):
     # delete(L3) 即便 sanctioned,在 scheduled actor 下也 BLOCKED(破坏性需人在场)
-    def fake_post(tool, payload):
-        if tool == "query_database":
+    def fake_send(method, path, json=None):
+        if path == "/databases/db-1/query":
             return {"results": [{
                 "id": "p1",
-                "properties": {"proposal_id": "009", "risk": "L3", "action": "delete",
-                               "target": "Concepts/X.md", "diff": "",
-                               "status": "approved"}}]}
+                "properties": {"proposal_id": _ttl("009"), "risk": _sel("L3"),
+                               "action": _sel("delete"),
+                               "target": _rt("Concepts/X.md"),
+                               "diff": _rt(""), "status": _sel("approved")}}]}
         return {}
 
-    client = NotionClient("http://mcp", "db-1", "db-2", post=fake_post)
+    client = NotionClient(proposal_db="db-1", projects_db="db-2", send=fake_send)
     v = Vault(vault)
     git = Git(vault)
     result = apply_approved(_cfg(), v, client, git, actor="scheduled_run")

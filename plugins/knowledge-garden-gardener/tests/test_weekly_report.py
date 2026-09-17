@@ -54,11 +54,12 @@ def test_publish_writes_local_copy_always(vault, force_filesystem):
     # weekly_db 未配置 → NotionConfigError,但本地副本仍写
     calls = []
 
-    def fake_post(tool, payload):
-        calls.append((tool, payload))
-        raise NotionConfigError("no weekly db")  # 不会这样抛,但模拟失败
+    def fake_send(method, path, json=None):
+        calls.append((method, path, json))
+        return {"id": "x"}
 
-    client = NotionClient("http://mcp", "p", "proj", post=fake_post, weekly_db="")
+    client = NotionClient(proposal_db="p", projects_db="proj",
+                          weekly_db="", send=fake_send)
     v = Vault(vault)
     stats = summarize(v, AuditReport(), [])
     publish(v, client, stats)
@@ -71,33 +72,34 @@ def test_publish_writes_local_copy_always(vault, force_filesystem):
 def test_publish_dual_writes_when_notion_configured(vault, force_filesystem):
     calls = []
 
-    def fake_post(tool, payload):
-        calls.append((tool, payload))
+    def fake_send(method, path, json=None):
+        calls.append((method, path, json))
         return {"id": "wk-page"}
 
-    client = NotionClient("http://mcp", "p", "proj", post=fake_post, weekly_db="wk-db")
+    client = NotionClient(proposal_db="p", projects_db="proj",
+                          weekly_db="wk-db", send=fake_send)
     v = Vault(vault)
     stats = summarize(v, AuditReport(orphans=["X.md"]), [])
     publish(v, client, stats)
     # 本地写了
     assert v.exists("_System/_Reports/weekly-report.md")
-    # Notion 写了
-    notion_calls = [c for c in calls if c[0] == "create_page"]
+    # Notion 写了:POST /pages,parent 指向周报库
+    notion_calls = [c for c in calls if c[1] == "/pages"]
     assert len(notion_calls) == 1
-    props = notion_calls[0][1]["properties"]
-    assert props["database_id"] if False else True  # placeholder
-    assert notion_calls[0][1]["database_id"] == "wk-db"
-    assert props["orphans_count"] == 1
+    payload = notion_calls[0][2]
+    assert payload["parent"] == {"database_id": "wk-db"}
+    assert payload["properties"]["orphans_count"] == {"number": 1}
 
 
 def test_publish_degrades_on_notion_unreachable(vault, force_filesystem):
     # Notion 网络不可达 → 本地仍写,不抛
     import httpx
 
-    def fake_post(tool, payload):
+    def fake_send(method, path, json=None):
         raise httpx.ConnectError("network down")
 
-    client = NotionClient("http://mcp", "p", "proj", post=fake_post, weekly_db="wk-db")
+    client = NotionClient(proposal_db="p", projects_db="proj",
+                          weekly_db="wk-db", send=fake_send)
     v = Vault(vault)
     stats = summarize(v, AuditReport(), [])
     publish(v, client, stats)  # 不应抛

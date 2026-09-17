@@ -20,10 +20,13 @@ def build_command(verb: str, args: dict) -> list[str]:
     if verb == "init":
         cmd.append("init")
         cmd += ["--vault", args.get("vault", ".")]
-        cmd += ["--mcp-endpoint", args["mcp_endpoint"]]
+        if args.get("api_base"):
+            cmd += ["--api-base", args["api_base"]]
+        if args.get("token_env"):
+            cmd += ["--token-env", args["token_env"]]
         cmd += ["--parent-page", args["parent_page"]]
-        if args.get("oauth_done"):
-            cmd.append("--oauth-done")
+        if args.get("auth_done") or args.get("oauth_done"):
+            cmd.append("--auth-done")
         return cmd
 
     # 其它 verb:全局参数在子命令前

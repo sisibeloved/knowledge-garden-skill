@@ -22,9 +22,12 @@ def register_cli(subparser: argparse.ArgumentParser) -> None:
 
     init_p = subs.add_parser("init", help="首次引导知识花园(vault + Notion 库)")
     init_p.add_argument("--vault", default=".", help="vault 根目录")
-    init_p.add_argument("--mcp-endpoint", required=False, help="Notion MCP endpoint")
-    init_p.add_argument("--parent-page", required=False, help="Notion 父页面 id")
-    init_p.add_argument("--oauth-done", action="store_true", help="已完成 Notion OAuth")
+    init_p.add_argument("--api-base", default=None, help="Notion REST API base(默认官方)")
+    init_p.add_argument("--token-env", default=None, help="读 token 的环境变量名(默认 NOTION_TOKEN)")
+    init_p.add_argument("--parent-page", required=False, help="Notion 父页面 URL 或 page id")
+    init_p.add_argument("--auth-done", action="store_true", help="已完成 Notion 授权配置")
+    init_p.add_argument("--oauth-done", action="store_true",
+                        help="已废弃,--auth-done 的别名")
 
     for verb in ("weekly-audit", "apply-approved", "triage-inbox", "review-orphans"):
         p = subs.add_parser(verb, help=f"garden {verb}")
@@ -59,12 +62,14 @@ def garden_command(args: argparse.Namespace) -> str:
         tool_args["config"] = args.config
     if getattr(args, "actor", None):
         tool_args["actor"] = args.actor
-    if getattr(args, "mcp_endpoint", None):
-        tool_args["mcp_endpoint"] = args.mcp_endpoint
+    if getattr(args, "api_base", None):
+        tool_args["api_base"] = args.api_base
+    if getattr(args, "token_env", None):
+        tool_args["token_env"] = args.token_env
     if getattr(args, "parent_page", None):
         tool_args["parent_page"] = args.parent_page
-    if getattr(args, "oauth_done", False):
-        tool_args["oauth_done"] = True
+    if getattr(args, "auth_done", False) or getattr(args, "oauth_done", False):
+        tool_args["auth_done"] = True
     if getattr(args, "text", None):
         tool_args["text"] = args.text
     if getattr(args, "source", None):

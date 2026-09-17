@@ -4,6 +4,37 @@
 
 格式基于 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/),版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [0.5.0] - 2026-09-17
+
+**Notion 传输层从未经真机验证的 REST 风格 mock 改为真 Notion 官方 REST API**(internal integration token 认证)。这是打通真实 Notion 的关键一步:此前 `POST {endpoint}/{tool}` 契约既不兼容官方 hosted MCP(JSON-RPC 单端点)也不兼容官方 REST API,`garden init` 从未在真实工作区建库成功过。
+
+### Added
+
+- **`NotionClient` 真 REST 传输**(`notion.py` 重写):Bearer token + `Notion-Version: 2022-06-28` 头;`send(method, path, json)` 注入点替代 `post(tool, payload)`;新增 `NotionAPIError`(继承 `httpx.HTTPError`,现有降级路径零改动);属性值双向转换(业务侧扁平值 ⇄ Notion 类型化对象:title/rich_text/select/multi_select/number/date/url/checkbox,`flatten_properties` 归一化查询结果)。
+- **token 走环境变量**:config 记 `token_env: NOTION_TOKEN`(secret 不入 Git);显式 `token` 参数 > 环境变量。
+- **`init_notion.create_all_databases` 产出真 REST payload**:title 富文本数组(此前是裸字符串,真 API 必 400)、select options 完整下发(此前被丢弃)、Tasks→Projects relation 自动接线(按创建顺序解析目标库 id)。
+- **`check_connection` 预检**(`GET /users/me`):401 → 指引检查 NOTION_TOKEN;404 → 指引父页面 ··· → Connections 分享给 integration。
+- **`parse_page_ref`**:`--parent-page` 接受页面 URL / 带/不带连字符的 32-hex id;正确丢弃 `?v=` view id。
+- **`garden init` 新参数**:`--api-base`(默认官方)/`--token-env`(默认 NOTION_TOKEN)/`--auth-done`;`--oauth-done` 保留为废弃别名;`--mcp-endpoint` 移除(从未对真实端点工作过)。
+- **config 兼容**:老 config 的 `mcp_endpoint` key 仍被读取(当 api_base 用),升级不破坏;`api_base`/`token_env`/`habits_database_id` 缺省时走默认值。
+
+### Changed
+
+- **`NotionClient` 构造改全关键字参数**(`proposal_db=`/`projects_db=`/...):传输层重写的破坏性变更,业务方法签名(create_proposal/poll_approved/write_applied_commit/create_task/write_weekly_report)不变。
+- **config notion 块**:`transport: rest` + `api_base` + `token_env` + 5 个 database id(新增 habits_database_id 回填)。
+- Hermes 包装 schemas/tools/cli:init 参数 mcp_endpoint → api_base/token_env/parent_page/auth_done,CLI 侧同步。
+- README/SKILL/agent-adapters 的 init 用法示例全部更新。
+
+### Fixed
+
+- **`garden init --config` 默认相对 CWD 解析**:argparse 默认值 `_Config/gardener.config.yaml` 相对调用者目录而非 vault,config 会写错位置(本机真机验证发现)。改为显式路径参数缺省时取 `<vault>/_Config/gardener.config.yaml`(新增 `_init_config_path` + 2 回归测试)。
+
+### Verified
+
+- `pytest tests/ -q` → **133 passed**(原 118 + 新增 15:REST 契约 8 + init payload 3 + parse_page_ref 4 + auth 别名/config 路径回归,净增因合并旧用例)。测试现锁死与 Notion API v1 的 wire 格式(类型化属性、filter 语法、parent 结构)。
+- **真机端到端验证**(v0.5.0 首次):`garden init --auth-done` 在真实工作区建 5 库成功;`GET /databases` 确认提案库 status 5 个 select options 完整、Tasks→Projects relation 正确接线、周报库 8 字段齐全;`poll_approved()` 真机空查询通过。
+- 版本号全量校验:9 处清单/断言同步 0.5.0。
+
 ## [0.4.0] - 2026-08-12
 
 补齐设计 §5.2 全部 5 个标准入口动词。原仅 `apply-approved` 完整,本次新增 `review-orphans`/`capture`,补全 `weekly-audit`(L1 自动 apply + 周报)与 `triage-inbox`(归类建议),并扩展 Notion 基础设施(第 5 库 + Task/周报写入)。

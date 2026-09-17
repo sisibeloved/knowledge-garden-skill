@@ -58,11 +58,14 @@ access:
   fallback: filesystem
 
 notion:
+  transport: rest
+  api_base: "__API_BASE__"
+  token_env: "__TOKEN_ENV__"
   proposal_database_id: "__PROPOSAL_DB__"
   projects_database_id: "__PROJECTS_DB__"
   tasks_database_id: "__TASKS_DB__"
+  habits_database_id: "__HABITS_DB__"
   weekly_database_id: "__WEEKLY_DB__"
-  mcp_endpoint: "__MCP_ENDPOINT__"
 """
 
 
@@ -128,7 +131,7 @@ def run_init(*, vault_root: Path, config_path: Path, checkpoint: Path,
         state.steps["notion_databases"] = True
         state.save(checkpoint)
 
-    # 4. 写 config(填入 database id + mcp_endpoint)
+    # 4. 写 config(填入 database id + api_base/token_env)
     # 用唯一标记替换,不用 .format()(避免 YAML 花括号被当占位符)
     if not state.steps.get("config_written"):
         config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -136,8 +139,10 @@ def run_init(*, vault_root: Path, config_path: Path, checkpoint: Path,
                 .replace("__PROPOSAL_DB__", state.database_ids.get("待审核提案", ""))
                 .replace("__PROJECTS_DB__", state.database_ids.get("Projects", ""))
                 .replace("__TASKS_DB__", state.database_ids.get("Tasks", ""))
+                .replace("__HABITS_DB__", state.database_ids.get("Habits", ""))
                 .replace("__WEEKLY_DB__", state.database_ids.get("周报", ""))
-                .replace("__MCP_ENDPOINT__", client.endpoint))
+                .replace("__API_BASE__", client.api_base)
+                .replace("__TOKEN_ENV__", client.token_env))
         config_path.write_text(text, encoding="utf-8")
         state.steps["config_written"] = True
         state.save(checkpoint)

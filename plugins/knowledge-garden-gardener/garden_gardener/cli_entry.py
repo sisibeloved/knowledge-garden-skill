@@ -1,11 +1,12 @@
 from __future__ import annotations
 import argparse
+import re
 import sys
 from pathlib import Path
 import httpx
 from .config import load_config
 from .vault import Vault
-from .notion import NotionClient
+from .notion import NotionClient, API_BASE, DEFAULT_TOKEN_ENV
 from .gitutil import Git
 from .audit import audit
 from .proposal import emit_proposals
@@ -19,41 +20,95 @@ from .init_notion import NotionBootstrapError
 from .init_plugins import install_instructions
 
 
+def parse_page_ref(ref: str) -> str:
+    """接受 Notion 页面 URL / 带/不带连字符的 page id,返回 32-hex id。
+
+    URL 形如 https://www.notion.so/Page-Title-<32hex>?v=<view-id>;
+    ?v= 是 view id 不是 page id,必须丢弃。
+    """
+    s = (ref or "").strip()
+    if not s:
+        raise ValueError("parent page 为空")
+    seg = s.split("?")[0].split("#")[0].rstrip("/").split("/")[-1]
+    m = re.search(r"([0-9a-fA-F]{32})$", seg)
+    if m:
+        return m.group(1).lower()
+    compact = re.sub(r"[^0-9a-fA-F]", "", s)
+    if len(compact) == 32:
+        return compact.lower()
+    raise ValueError(f"无法从 {ref!r} 解析出 page id(粘贴页面完整链接,或 32 位 id)")
+
+
+def _client_from_config(cfg, *, with_weekly: bool = True) -> NotionClient:
+    """从 config notion 段构造 client。
+
+    api_base 兼容旧 key mcp_endpoint(旧 config 不破坏;其值原样当 REST base 用)。
+    """
+    n = cfg.notion
+    api_base = n.get("api_base") or n.get("mcp_endpoint") or API_BASE
+    return NotionClient(
+        proposal_db=n["proposal_database_id"],
+        projects_db=n["projects_database_id"],
+        tasks_db=n.get("tasks_database_id", ""),
+        weekly_db=n.get("weekly_database_id", "") if with_weekly else "",
+        api_base=api_base,
+        token_env=n.get("token_env", DEFAULT_TOKEN_ENV),
+    )
+
+
+def _init_config_path(args) -> Path:
+    """init 的 config 输出路径:显式 --config 用之,否则 <vault>/_Config/。
+
+    不能用 argparse default 相对路径——它相对 CWD 解析,init 会把 config
+    写到调用者所在目录而不是 vault 里。
+    """
+    if args.config:
+        return Path(args.config)
+    return Path(args.vault) / "_Config" / "gardener.config.yaml"
+
+
 def _cmd_init(args) -> int:
     """garden init: 引导整个知识花园(vault + Notion + 插件清单)。
 
-    OAuth 是唯一人工断点:首次跑返回 NEEDS_OAUTH(exit 3),打印指引;
-    用户完成 Notion OAuth 授权后,带 --oauth-done 重跑即可续。
+    授权是唯一人工断点(建 integration + 设 token + 分享页面):首次跑返回
+    NEEDS_OAUTH(exit 3),打印指引;完成后带 --auth-done 重跑即可续。
     Notion 不可达时返回 exit 4 + 友好消息(不抛栈),checkpoint 保留可续跑。
     """
-    client = NotionClient(args.mcp_endpoint, "pending", "pending")
+    try:
+        parent_page = parse_page_ref(args.parent_page)
+    except ValueError as e:
+        print(f"--parent-page 参数错误:{e}", file=sys.stderr)
+        return 1
+    client = NotionClient(api_base=args.api_base, token_env=args.token_env)
     try:
         result = run_init(
             vault_root=Path(args.vault),
-            config_path=Path(args.config),
+            config_path=_init_config_path(args),
             checkpoint=Path(args.vault) / ".garden-init.json",
             client=client,
-            parent_page_id=args.parent_page,
-            oauth_already_done=args.oauth_done,
+            parent_page_id=parent_page,
+            oauth_already_done=args.auth_done,
         )
     except NotionBootstrapError as e:
         print("=" * 60, file=sys.stderr)
         print("Notion 连接失败,无法建库。", file=sys.stderr)
         print(f"原因:{e}", file=sys.stderr)
         print("已完成的步骤已保存,修复后重新运行同样的命令即可续跑(不会重头)。", file=sys.stderr)
-        print("常见原因:endpoint 错误、OAuth 未真正完成、网络不通。", file=sys.stderr)
+        print("常见原因:NOTION_TOKEN 未设置/token 无效、父页面未分享给 integration、网络不通。", file=sys.stderr)
         print("=" * 60, file=sys.stderr)
         return 4
     if result == NEEDS_OAUTH:
         print("=" * 60)
-        print("需要完成 Notion OAuth 授权(唯一人工步骤):")
-        print("  1. 打开 Notion → Settings → My connections / 开发者设置")
-        print("  2. 按 Notion MCP 官方文档完成 OAuth(scope 最小化,")
-        print("     只授权 garden init 要建的库所在的 page)")
-        print("  3. 确认 MCP endpoint 可达后,重新运行:")
+        print("需要完成 Notion 授权(唯一人工步骤,integration token 方式):")
+        print("  1. 打开 https://www.notion.so/my-integrations → New integration")
+        print("     (类型 Internal, capability 勾 Insert content + Update content)")
+        print("  2. 复制 Internal Token(ntn_ 开头),设置环境变量:")
+        print(f"       {args.token_env}=ntn-xxxx")
+        print("  3. 在 Notion 里打开父页面 → 右上 ··· → Connections →")
+        print("     添加刚建的 integration(只授权这一个页面,scope 最小化)")
+        print("  4. 完成后重新运行(带 --auth-done):")
         print(f"       garden init --vault {args.vault} \\")
-        print(f"         --mcp-endpoint {args.mcp_endpoint} \\")
-        print(f"         --parent-page {args.parent_page} --oauth-done")
+        print(f"         --parent-page {args.parent_page} --auth-done")
         print("=" * 60)
         return 3
     print("init 完成。", install_instructions(Path(args.vault)))
@@ -83,14 +138,18 @@ def main(argv: list[str] | None = None) -> int:
     # init 有独立的 --vault/--config(init 是创建 config,不读取),故在此子命令重新声明
     init_p.add_argument("--vault", default=".",
                         help="vault 根目录(init 会在此建骨架+config)")
-    init_p.add_argument("--config", default="_Config/gardener.config.yaml",
-                        help="config 输出路径")
-    init_p.add_argument("--mcp-endpoint", required=True,
-                        help="Notion MCP endpoint")
+    init_p.add_argument("--config", default=None,
+                        help="config 输出路径(默认 <vault>/_Config/gardener.config.yaml)")
     init_p.add_argument("--parent-page", required=True,
-                        help="Notion 父页面 id,4 个库建在其下")
+                        help="Notion 父页面 URL 或 page id,5 个库建在其下")
+    init_p.add_argument("--api-base", default=API_BASE,
+                        help="Notion REST API base(默认官方 https://api.notion.com/v1)")
+    init_p.add_argument("--token-env", default=DEFAULT_TOKEN_ENV,
+                        help="读 token 的环境变量名(默认 NOTION_TOKEN)")
+    init_p.add_argument("--auth-done", action="store_true",
+                        help="已完成 integration token 配置 + 父页面分享(首次跑不要带)")
     init_p.add_argument("--oauth-done", action="store_true",
-                        help="已完成 Notion OAuth(首次跑不要带,断点后带上续跑)")
+                        help="已废弃,--auth-done 的别名(兼容旧脚本)")
 
     args = p.parse_args(argv)
 
@@ -105,6 +164,8 @@ def main(argv: list[str] | None = None) -> int:
         return Path(args.vault) / "_Config" / "gardener.config.yaml"
 
     if args.cmd == "init":
+        # --oauth-done 是 --auth-done 的废弃别名
+        args.auth_done = args.auth_done or args.oauth_done
         return _cmd_init(args)
 
     vault = Vault(Path(args.vault))
@@ -127,12 +188,7 @@ def main(argv: list[str] | None = None) -> int:
         cap_client = None
         try:
             cap_cfg = load_config(config_path)
-            cap_client = NotionClient(
-                cap_cfg.notion["mcp_endpoint"],
-                cap_cfg.notion["proposal_database_id"],
-                cap_cfg.notion["projects_database_id"],
-                tasks_db=cap_cfg.notion.get("tasks_database_id", ""),
-            )
+            cap_client = _client_from_config(cap_cfg, with_weekly=False)
         except FileNotFoundError:
             pass  # 无 config → 只落 Raw(正常路径,不警告)
         except Exception as e:
@@ -153,13 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         print("若 vault 是首次搭建,请先跑 `garden init --vault <vault>`。", file=sys.stderr)
         print("=" * 60, file=sys.stderr)
         return 5
-    client = NotionClient(
-        cfg.notion["mcp_endpoint"],
-        cfg.notion["proposal_database_id"],
-        cfg.notion["projects_database_id"],
-        tasks_db=cfg.notion.get("tasks_database_id", ""),
-        weekly_db=cfg.notion.get("weekly_database_id", ""),
-    )
+    client = _client_from_config(cfg)
 
     if args.cmd == "weekly-audit":
         if not git.pull():

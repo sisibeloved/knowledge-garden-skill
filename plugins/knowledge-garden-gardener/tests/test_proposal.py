@@ -9,25 +9,29 @@ def test_orphan_becomes_link_proposal(vault, force_filesystem):
     rep = AuditReport(orphans=["Concepts/isolated.md"])
     created = []
 
-    def fake_post(tool, payload):
-        created.append((tool, payload))
+    def fake_send(method, path, json=None):
+        created.append((method, path, json))
         return {"id": f"page-{len(created)}"}
 
-    client = NotionClient("http://mcp", "db-1", "db-2", post=fake_post)
+    client = NotionClient(proposal_db="db-1", projects_db="db-2", send=fake_send)
     page_ids = emit_proposals(Vault(vault), client, rep, actor="manual_session")
     assert len(page_ids) == 1
-    assert created[0][1]["properties"]["action"] == "link"
-    assert created[0][1]["properties"]["risk"] == "L2"
-    assert created[0][1]["properties"]["target"] == "Concepts/isolated.md"
+    payload = created[0][2]
+    assert payload["parent"] == {"database_id": "db-1"}
+    props = payload["properties"]
+    # 类型化属性:select.name / rich_text.content
+    assert props["action"] == {"select": {"name": "link"}}
+    assert props["risk"] == {"select": {"name": "L2"}}
+    assert props["target"]["rich_text"][0]["text"]["content"] == "Concepts/isolated.md"
 
 
 def test_fallback_stores_locally_when_notion_fails(vault, force_filesystem):
     rep = AuditReport(orphans=["Concepts/x.md"])
 
-    def fake_post(tool, payload):
+    def fake_send(method, path, json=None):
         raise RuntimeError("notion down")
 
-    client = NotionClient("http://mcp", "db-1", "db-2", post=fake_post)
+    client = NotionClient(proposal_db="db-1", projects_db="db-2", send=fake_send)
     v = Vault(vault)
     page_ids = emit_proposals(v, client, rep, actor="manual_session")
     assert page_ids == []  # 没成功入 Notion

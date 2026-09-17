@@ -40,17 +40,20 @@ def test_capture_raw_writes_inbox_with_frontmatter(vault, force_filesystem):
 def test_capture_task_creates_notion_task(vault, force_filesystem):
     calls = []
 
-    def fake_post(tool, payload):
-        calls.append((tool, payload))
+    def fake_send(method, path, json=None):
+        calls.append((method, path, json))
         return {"id": "task-99"}
 
-    client = NotionClient("http://mcp", "p", "proj", post=fake_post, tasks_db="t-db")
+    client = NotionClient(proposal_db="p", projects_db="proj",
+                          tasks_db="t-db", send=fake_send)
     res = run_capture(Vault(vault), "明天要完成周报", client=client)
     assert res.destination == "task"
     assert res.path_or_id == "task-99"
-    # 调了 create_page,写 tasks_db
-    assert calls[0][0] == "create_page"
-    assert calls[0][1]["database_id"] == "t-db"
+    # POST /pages,parent 指向 tasks 库
+    method, path, payload = calls[0]
+    assert (method, path) == ("POST", "/pages")
+    assert payload["parent"] == {"database_id": "t-db"}
+    assert payload["properties"]["Name"]["title"][0]["text"]["content"] == "明天要完成周报"
     # 没写 Raw
     assert not Vault(vault).exists("_System/_Inbox") or \
         not any(Vault(vault).read_glob("_System/_Inbox/*.md"))
@@ -67,10 +70,11 @@ def test_capture_task_falls_back_to_raw_when_no_client(vault, force_filesystem):
 
 
 def test_capture_task_falls_back_on_notion_unreachable(vault, force_filesystem):
-    def fake_post(tool, payload):
+    def fake_send(method, path, json=None):
         raise httpx.ConnectError("down")
 
-    client = NotionClient("http://mcp", "p", "proj", post=fake_post, tasks_db="t-db")
+    client = NotionClient(proposal_db="p", projects_db="proj",
+                          tasks_db="t-db", send=fake_send)
     res = run_capture(Vault(vault), "明天要完成周报", client=client)
     assert res.destination == "raw_fallback"
     fm, _ = parse(Vault(vault).read(res.path_or_id))

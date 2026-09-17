@@ -1,11 +1,11 @@
 # 🌿 知识花园园丁
 
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#安装)
 [![Codex](https://img.shields.io/badge/Codex-plugin-0A7EA4.svg)](#安装)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-bundle-8A2BE2.svg)](#安装)
 [![Hermes](https://img.shields.io/badge/Hermes-plugin-FF6B35.svg)](#安装)
-[![Tests](https://img.shields.io/badge/tests-65%20pass-success.svg)](#测试)
+[![Tests](https://img.shields.io/badge/tests-131%20pass-success.svg)](#测试)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 面向个人工作流的知识花园复合技能插件,以 Claude Code / Codex 插件形式交付。核心理念:**Agent 当园丁,不当作者**——负责搜、整理、补链接、生成草稿、发现孤岛与矛盾;真正进入长期知识库的结论必须经人在 Notion 移动端审批。
@@ -25,7 +25,7 @@
 
 | 入口 | 用途 | 风险 |
 |---|---|---|
-| 🌱 `init` | 首次引导:自动建 vault 骨架 + Notion 4 库 + 插件清单(OAuth 是唯一人工断点) | L0 |
+| 🌱 `init` | 首次引导:自动建 vault 骨架 + Notion 5 库 + 插件清单(integration token 授权是唯一人工断点) | L0 |
 | 🔍 `weekly-audit` | 只读审计 vault(孤岛/过时/Inbox),生成提案入 Notion | 不写 Evergreen |
 | ✅ `apply-approved` | 轮询 Notion 已批准提案 → apply 到 Evergreen + git commit + 回写 | L2/L3 需授权 |
 | 📥 `triage-inbox` | 列出 `_System/_Inbox/` 待处理 Raw | 只读 |
@@ -92,10 +92,12 @@ pip install -e . pytest pyyaml httpx
 ## 💬 使用示例
 
 ```bash
-# 首次引导(自动建 vault + Notion 库,OAuth 是唯一人工断点)
-garden init --vault ./Garden --mcp-endpoint <endpoint> --parent-page <notion-page-id>
-# OAuth 完成后续跑
-garden init --vault ./Garden --mcp-endpoint <endpoint> --parent-page <notion-page-id> --oauth-done
+# 首次引导(自动建 vault + Notion 5 库,授权是唯一人工断点)
+garden init --vault ./Garden --parent-page <notion页面URL或page-id>
+#    → exit 3 + 指引:建 integration(https://notion.so/my-integrations)、
+#      设 NOTION_TOKEN=ntn-xxx、把父页面 ··· → Connections 分享给它
+# 授权完成后带 --auth-done 续跑(其余全自动)
+garden init --vault ./Garden --parent-page <notion页面URL或page-id> --auth-done
 
 # 每周巡园(只读审计 + 生成提案入 Notion,不写 Evergreen)
 garden --config _Config/gardener.config.yaml --vault . weekly-audit
@@ -135,7 +137,7 @@ cd plugins/knowledge-garden-gardener
 python -m pytest -v
 ```
 
-当前:46 tests pass,覆盖 config/risk/frontmatter/vault/gitutil/notion/audit/proposal/apply/init 全模块。
+当前:131 tests pass,覆盖 config/risk/frontmatter/vault/gitutil/notion/audit/proposal/apply/capture/triage/init 全模块(含 Notion REST wire 契约)。
 
 ## 📚 文档
 

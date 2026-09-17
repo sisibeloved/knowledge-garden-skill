@@ -31,20 +31,26 @@ from garden import tools, schemas, cli  # noqa: E402
 
 def test_build_command_init():
     cmd = tools.build_command("init", {
-        "vault": "./Garden", "mcp_endpoint": "http://x", "parent_page": "pp",
+        "vault": "./Garden", "parent_page": "pp",
     })
     assert cmd[0] == "garden"
     assert "init" in cmd
-    assert "--mcp-endpoint" in cmd and "http://x" in cmd
     assert "--parent-page" in cmd and "pp" in cmd
-    assert "--oauth-done" not in cmd
+    assert "--auth-done" not in cmd
 
-def test_build_command_init_with_oauth():
+def test_build_command_init_with_auth_done():
     cmd = tools.build_command("init", {
-        "vault": "./G", "mcp_endpoint": "http://x", "parent_page": "pp",
-        "oauth_done": True,
+        "vault": "./G", "parent_page": "pp", "auth_done": True,
     })
-    assert "--oauth-done" in cmd
+    assert "--auth-done" in cmd
+
+def test_build_command_init_passes_api_base_and_token_env():
+    cmd = tools.build_command("init", {
+        "vault": "./G", "parent_page": "pp",
+        "api_base": "https://api.notion.com/v1", "token_env": "MY_TOKEN",
+    })
+    assert "--api-base" in cmd and "https://api.notion.com/v1" in cmd
+    assert "--token-env" in cmd and "MY_TOKEN" in cmd
 
 def test_build_command_weekly_audit():
     cmd = tools.build_command("weekly-audit", {"vault": "./G", "config": "c.yaml"})
@@ -118,13 +124,14 @@ def test_cli_setup_fn_builds_subcommands():
     parser = argparse.ArgumentParser(prog="hermes garden")
     cli.register_cli(parser)
     # init 子命令必须存在
-    ns = parser.parse_args(["init", "--mcp-endpoint", "http://x", "--parent-page", "pp"])
+    ns = parser.parse_args(["init", "--parent-page", "pp"])
     assert ns.garden_command == "init"
-    assert ns.mcp_endpoint == "http://x"
+    assert ns.parent_page == "pp"
 
 def test_cli_handler_routes_init():
-    ns = argparse.Namespace(garden_command="init", vault=".", mcp_endpoint="http://x",
-                            parent_page="pp", oauth_done=False)
+    ns = argparse.Namespace(garden_command="init", vault=".", api_base=None,
+                            token_env=None, parent_page="pp",
+                            auth_done=False, oauth_done=False)
     # garden_command handler 把 namespace 转 dict 调 tool handler
     result = cli.garden_command(ns)
     data = json.loads(result)
@@ -177,7 +184,7 @@ def test_plugin_yaml_exists_and_valid():
     assert p.exists()
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     assert data["name"] == "garden"
-    assert data["version"] == "0.4.0"
+    assert data["version"] == "0.5.0"
     assert data["kind"] == "standalone"
     assert "windows" in data["platforms"]  # 本机是 Windows,必须支持
     assert "garden_init" in data["provides_tools"]
@@ -194,7 +201,7 @@ def test_schemas_use_real_cli_params():
         assert "path" not in props, f"{s['name']} 不应用虚构的 path"
     assert "vault" in schemas.WEEKLY_AUDIT["parameters"]["properties"]
     assert "actor" in schemas.APPLY_APPROVED["parameters"]["properties"]
-    assert "mcp_endpoint" in schemas.INIT["parameters"]["properties"]
+    assert "parent_page" in schemas.INIT["parameters"]["properties"]
 
 
 def test_schemas_capture_has_required_text():
