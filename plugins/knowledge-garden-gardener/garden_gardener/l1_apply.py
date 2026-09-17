@@ -171,6 +171,23 @@ def suggest_wikilinks(body: str, title: str, titles: set[str],
     return _find_links(body, title, titles, existing_links or [])
 
 
+def apply_wikilinks(vault: Vault, rel: str, titles: list[str]) -> bool:
+    """把 [[titles]] 写入笔记(frontmatter links + 正文首处),返回是否有改动。
+
+    供 apply.py 用:园主批准 link 提案后,把 diff 里的建议链接落到笔记。
+    与 L1 add_wikilink 落盘行为一致(同一 _apply_links)。
+    """
+    if not titles:
+        return False
+    fm, body = parse(vault.read(rel))
+    before = list(fm.get("links") or [])
+    body = _apply_links(fm, body, titles)
+    if list(fm.get("links") or []) == before:
+        return False  # 全部已存在,无改动
+    vault.write(rel, dump(fm, body), risk_level="L2")
+    return True
+
+
 def archive_expired_inbox(vault: Vault, git: Git) -> int:
     """归档已过期的随手记:_System/_Inbox 里 expires_at 早于今天的 → _Archive/_Inbox。
 

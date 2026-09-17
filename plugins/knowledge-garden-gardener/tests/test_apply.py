@@ -4,6 +4,7 @@ from garden_gardener.notion import NotionClient
 from garden_gardener.gitutil import Git
 from garden_gardener.config import Config
 from garden_gardener.apply import apply_approved
+from garden_gardener.frontmatter import parse, dump
 
 
 def _cfg() -> Config:
@@ -80,3 +81,31 @@ def test_apply_blocked_when_l3_on_scheduled(vault, force_filesystem):
     assert result.blocked == ["p1"]
     assert result.applied == []
     assert not v.exists("Concepts/X.md")  # 没写
+
+
+def test_apply_link_writes_suggested_links(vault, force_filesystem):
+    """批准 link 提案 → diff 里的建议 [[ ]] 真正写进笔记(fm.links + 正文)。"""
+    from garden_gardener.frontmatter import parse
+
+    def fake_send(method, path, json=None):
+        if path == "/databases/db-1/query":
+            return {"results": [{
+                "id": "p1",
+                "properties": {"proposal_id": _ttl("003"), "risk": _sel("L2"),
+                               "action": _sel("link"),
+                               "target": _rt("Notes/lonely.md"),
+                               "diff": _rt("建议补链:[[RAG]]、[[Retrieval]]"),
+                               "status": _sel("approved")}}]}
+        return {"id": "p1"}
+
+    v = Vault(vault)
+    v.write("Notes/lonely.md", dump({"title": "lonely", "links": []},
+            "讲 RAG 与 Retrieval 的关系"), risk_level="L2")
+    v.write("Concepts/RAG.md", dump({"title": "RAG"}, "b"), risk_level="L2")
+    client = NotionClient(proposal_db="db-1", projects_db="db-2", send=fake_send)
+    result = apply_approved(_cfg(), v, client, Git(vault), actor="manual_session")
+    assert result.applied == ["p1"]
+    fm, body = parse(v.read("Notes/lonely.md"))
+    assert "[[RAG]]" in fm.get("links", [])
+    assert "[[Retrieval]]" in fm.get("links", [])
+    assert "[[RAG]]" in body  # 正文首处也替换

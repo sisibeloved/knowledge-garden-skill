@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from dataclasses import dataclass, field
 from .config import Config
 from .vault import Vault
@@ -6,6 +7,7 @@ from .notion import NotionClient
 from .gitutil import Git
 from .risk import decide, Decision, Actor
 from .frontmatter import dump
+from .l1_apply import apply_wikilinks
 
 # Notion 提案的 action → 内部 operation 名(映射到 config.operations)
 _ACTION_TO_OP = {
@@ -43,7 +45,7 @@ def apply_approved(cfg: Config, vault: Vault, client: NotionClient, git: Git,
         if d == Decision.BLOCKED:
             res.blocked.append(item["id"])
             continue
-        # 执行写入(create: 写 diff 全文;link/其它: 暂记 needs desktop review)
+        # 执行写入:create → 写 diff 全文;link → 把 diff 里的建议 [[ ]] 落进笔记
         target = props.get("target", "")
         if action == "create":
             fm = {
@@ -55,6 +57,10 @@ def apply_approved(cfg: Config, vault: Vault, client: NotionClient, git: Git,
                 "confidence": props.get("confidence", 0.5),
             }
             vault.write(target, dump(fm, props.get("diff", "")), risk_level="L2")
+        elif action == "link":
+            suggested = re.findall(r"\[\[([^\]|#]+?)\]\]",
+                                   props.get("diff", "") or "")
+            apply_wikilinks(vault, target, [s.strip() for s in suggested])
         sha = git.commit_all(
             cfg.risk_of(op), f"{action} {target}",
             notion_id=props.get("proposal_id"),

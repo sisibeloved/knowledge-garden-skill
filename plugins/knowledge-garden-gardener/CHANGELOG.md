@@ -4,6 +4,21 @@
 
 格式基于 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/),版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+
+## [0.6.1] - 2026-09-17
+
+审批队列语义修正:**队列里只放"人批了才有动作"的事**(园主反馈"看不出要审核什么"催生)。
+
+### Changed
+
+- **标题匹配的补链不再进审批队列**:它与 L1 add_wikilink 同源——weekly-audit 同一轮就会自动补上,入队只会产生"批了也白批"的噪音。孤岛清单继续在周报「孤岛清单」里看(手机可读)。`_from_audit` 新增 `semantic` 入参:二期 Smart Connections/LLM 的语义建议(L1 做不了的判断)经此入队,提案正文含【批准后动作】说明。
+- **`apply_approved` 真正落地 link 提案**:此前 link 批准后只打空 commit 不写文件。现在把 diff 里的建议 `[[ ]]` 写进目标笔记(frontmatter links + 正文首处,与 L1 同一套 `_apply_links`,经公开包装 `l1_apply.apply_wikilinks`)。
+
+### Verified
+
+- `pytest tests/ -q` → **148 passed**(提案准入重写 ×4 + link 落盘 ×1,合并原用例)。
+- 真机:清空旧 12 条"需人工判断"提案(新规则下不再产生)。
+
 ## [0.6.0] - 2026-09-17
 
 真实 vault 迁移(48 篇笔记)后按园主反馈做的三项体验改进:多级分类、提案可读化、随手记生命周期。

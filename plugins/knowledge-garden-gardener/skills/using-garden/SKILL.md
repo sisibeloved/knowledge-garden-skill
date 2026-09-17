@@ -34,7 +34,7 @@ garden init --vault <vault> --parent-page <notion页面URL或page-id>
 
 ### weekly-audit(只读审计 + L1 自动 apply + 周报)
 
-只读审计 vault(孤岛/过时/Inbox),生成 L2 提案入 Notion「待审核提案」库。**不写 Evergreen 结论**(只产 L2 提案),但会**本轮自动执行 L1 低风险写**(无需 Notion 凭证):
+只读审计 vault(孤岛/过时/Inbox),孤岛清单记入周报。**审批队列只放"人批了才有动作"的事**(语义补链/新建 Evergreen;标题匹配的补链 L1 本轮自动做,不进队列),并**本轮自动执行 L1 低风险写**(无需 Notion 凭证):
 - backfill 缺失 frontmatter(id/created_at/updated_at/status)
 - 关键词补链(正文命中其它 Evergreen 标题 → 加 `[[ ]]` + links 字段)
 - 英文高频词补 tags(仅 tags 为空时;中文分词待二期)
@@ -61,7 +61,7 @@ garden --config <vault>/_Config/gardener.config.yaml --vault <vault> --actor sch
 
 ### review-orphans(孤岛审查)
 
-只读审计孤岛笔记(无 links + 无反向链接 + 较老),生成补链提案入 Notion「待审核提案」库(L2 link 提案)。比 weekly-audit 聚焦——只看孤岛。不写 Evergreen。
+只读审计孤岛笔记(无 links + 无反向链接 + 较老),孤岛清单进周报。比 weekly-audit 聚焦——只看孤岛。不写 Evergreen、不产无动作提案。
 
 ```
 garden --config <vault>/_Config/gardener.config.yaml --vault <vault> review-orphans

@@ -5,7 +5,6 @@ from .vault import Vault
 from .notion import NotionClient, Proposal
 from .audit import AuditReport
 from .frontmatter import parse
-from .l1_apply import suggest_wikilinks
 
 
 def _pending_targets(client: NotionClient) -> set[str] | None:
@@ -63,12 +62,15 @@ def replay_pending(vault: Vault, client: NotionClient,
 
 
 def emit_proposals(vault: Vault, client: NotionClient, rep: AuditReport,
-                   *, actor: str) -> list[str]:
+                   *, actor: str,
+                   semantic: dict[str, list[str]] | None = None) -> list[str]:
     """把审计报告转成提案,写 Notion;失败暂存本地 _PendingProposals/。
 
     防重复:先查库里 pending 的 target——已有 pending 提案的孤岛本轮跳过
     (否则每周 audit 都会给同一批未审批孤岛堆新提案)。Notion 不可达时
     照常生成(失败暂存,下轮 replay 去重)。
+    semantic:孤岛 → 语义建议链接(二期 Smart Connections/LLM 供给;
+    标题匹配的建议由 L1 自动补,不进队列——见 _from_audit)。
     返回成功入 Notion 的 page id 列表。绝不直接 apply(apply 在 apply.py,需 Notion approved)。
     """
     pending = _pending_targets(client)
@@ -78,7 +80,7 @@ def emit_proposals(vault: Vault, client: NotionClient, rep: AuditReport,
         orphans = list(rep.orphans)
     else:
         orphans = [o for o in rep.orphans if o not in pending]
-    proposals = _from_audit(vault, AuditReport(orphans=orphans))
+    proposals = _from_audit(vault, AuditReport(orphans=orphans), semantic=semantic)
     page_ids: list[str] = []
     for prop in proposals:
         try:
@@ -104,57 +106,50 @@ def _evergreen_titles(vault: Vault) -> set[str]:
     return titles
 
 
-def _from_audit(vault: Vault, rep: AuditReport) -> list[Proposal]:
-    """把审计结果转成提案。孤岛 → 补链提案(L2),附具体建议链接。
+def _from_audit(vault: Vault, rep: AuditReport,
+                semantic: dict[str, list[str]] | None = None) -> list[Proposal]:
+    """把审计结果转成提案。孤岛 → 补链提案(L2)。
 
-    建议链接用与 L1 add_wikilink 同一套匹配(suggest_wikilinks):正文命中
-    其它 Evergreen 标题。提案 detail 写"现状 + 建议 + 摘录",园主在手机上
-    不打开 vault 也能判断批不批。
+    审批队列准入原则:**只放"人批了才有动作"的事**。
+    - 标题匹配的补链不进队列——与 L1 add_wikilink 同一套匹配,
+      weekly-audit 同一轮就会自动补上(无需审批),入队列只会产生
+      "批了也白批"的噪音;
+    - semantic(二期 Smart Connections/LLM 语义建议:{rel → [标题]})
+      是 L1 做不了的判断,才值得进 Notion 让园主批;
+    - 无建议的孤岛不进队列,清单在周报「孤岛清单」里看(手机可读)。
     """
+    if not semantic:
+        return []
     titles = _evergreen_titles(vault)
     out: list[Proposal] = []
     ts = time.strftime("%Y-%m-%d")
-    for i, target in enumerate(rep.orphans):
-        title, body, suggestions, existing = _read_orphan(vault, target, titles)
-        if suggestions:
-            diff = "建议补链:" + "、".join(f"[[{s}]]" for s in suggestions)
-            confidence = 0.6
-        else:
-            diff = "无自动匹配(正文未命中其它笔记标题),需人工判断相关笔记"
-            confidence = 0.4
+    for target in rep.orphans:
+        suggestions = [s for s in semantic.get(target, []) if s in titles]
+        if not suggestions:
+            continue
+        diff = "建议补链:" + "、".join(f"[[{s}]]" for s in suggestions)
         detail_lines = [
-            f"【现状】《{title or target}》是孤岛笔记:无 links 且无反向链接。",
-            f"【建议】{diff}",
-            f"【摘录】{_excerpt(body)}",
+            f"【现状】《{target}》是孤岛笔记:无 links 且无反向链接。",
+            f"【建议】{diff}(语义相关,非标题字面命中,L1 不会自动补)",
+            f"【批准后动作】apply-approved 会把上述 [[ ]] 写入该笔记 frontmatter links + 正文,并 git commit。",
         ]
         out.append(Proposal(
-            proposal_id=f"{ts}-{i+1:03d}", risk="L2", action="link",
-            target=target, sources=[], confidence=confidence,
+            proposal_id=f"{ts}-{len(out)+1:03d}", risk="L2", action="link",
+            target=target, sources=[], confidence=0.6,
             diff=diff,
             detail="\n".join(detail_lines),
-            display=title or "",
+            display=_note_title(vault, target) or "",
         ))
     return out
 
 
-def _read_orphan(vault: Vault, rel: str, titles: set[str]) -> tuple[str, str, list[str], list[str]]:
-    """读孤岛笔记,返回 (title, body, 建议链接, 既有 links)。读不了给空值。"""
+def _note_title(vault: Vault, rel: str) -> str:
+    """读笔记 title(提案展示名);读不了返回空。"""
     try:
-        fm, body = parse(vault.read(rel))
+        fm, _ = parse(vault.read(rel))
+        return fm.get("title") or ""
     except Exception:
-        return "", "", [], []
-    title = fm.get("title") or ""
-    suggestions = suggest_wikilinks(body, title, titles, fm.get("links", []))
-    return title, body, suggestions, fm.get("links", []) or []
-
-
-def _excerpt(body: str, limit: int = 160) -> str:
-    """正文首段非空文本,截断。"""
-    for line in (body or "").splitlines():
-        s = line.strip().lstrip("#>").strip()
-        if s:
-            return s[:limit] + ("…" if len(s) > limit else "")
-    return "(空)"
+        return ""
 
 
 def _stash_locally(vault: Vault, prop: Proposal) -> None:
