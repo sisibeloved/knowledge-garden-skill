@@ -1,6 +1,6 @@
 # 🌿 知识花园园丁
 
-[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.2-blue.svg)](plugins/knowledge-garden-gardener/CHANGELOG.md)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-D97757.svg)](#安装)
 [![Codex](https://img.shields.io/badge/Codex-plugin-0A7EA4.svg)](#安装)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-bundle-8A2BE2.svg)](#安装)

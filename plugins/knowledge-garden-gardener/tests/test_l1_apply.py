@@ -124,17 +124,20 @@ def test_wikilink_no_duplicate(vault, force_filesystem):
 
 # ---------- add_tag ----------
 
-def test_tag_added_when_empty_and_english_frequent(vault, force_filesystem):
-    _note(vault, "Concepts/Eng.md", {"title": "T"},
-          "Retrieval retrieval generation generation embedding")
-    # retrieval×2, generation×2, embedding×1 → tags=[retrieval, generation]
+def test_tag_from_directory_path(vault, force_filesystem):
+    """tags 来自目录路径(主题分类),不再从正文提英文高频词。"""
+    _note(vault, "Concepts/Kunpeng/芯片概念/Chip.md", {"title": "T"}, "body")
+    _note(vault, "Notes/CPython/报告.md", {"title": "R"}, "body")
+    _note(vault, "Concepts/顶层.md", {"title": "Top"}, "Retrieval retrieval generation")
     v, git = Vault(vault), Git(vault)
     res = apply_l1(_cfg(), v, git, actor="manual_session", batch_max=50)
-    assert res.tagged == 1
-    fm, _ = parse(v.read("Concepts/Eng.md"))
-    assert "retrieval" in fm["tags"]
-    assert "generation" in fm["tags"]
-    assert "embedding" not in fm["tags"]  # 只出现 1 次
+    assert res.tagged == 2  # 有目录信号的 2 篇;顶层笔记不打
+    fm, _ = parse(v.read("Concepts/Kunpeng/芯片概念/Chip.md"))
+    assert fm["tags"] == ["Kunpeng", "芯片概念"]
+    fm2, _ = parse(v.read("Notes/CPython/报告.md"))
+    assert fm2["tags"] == ["CPython"]
+    fm3, _ = parse(v.read("Concepts/顶层.md"))
+    assert not fm3.get("tags")  # 顶层无目录信号;英文高频词方案已废弃
 
 
 def test_tag_not_overwriting_existing(vault, force_filesystem):
@@ -184,7 +187,7 @@ def test_disabled_l1_op_skipped(vault, force_filesystem):
 
 def test_each_op_class_separate_commit(vault, force_filesystem):
     # A 同时触发 backfill + 补链 + 加标签;B 完整(只作补链目标) → 3 个 commit
-    _note(vault, "Concepts/A.md", {"title": "A"},
+    _note(vault, "Concepts/主题/A.md", {"title": "A"},
           "向量数据库 向量数据库 retrieval retrieval generation generation")
     _note(vault, "Concepts/B.md",
           {"id": "b", "title": "向量数据库", "created_at": "2026-01-01",

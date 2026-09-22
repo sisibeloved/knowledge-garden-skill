@@ -37,7 +37,7 @@ garden init --vault <vault> --parent-page <notion页面URL或page-id>
 只读审计 vault(孤岛/过时/Inbox),孤岛清单记入周报。**审批队列只放"人批了才有动作"的事**(语义补链/新建 Evergreen;标题匹配的补链 L1 本轮自动做,不进队列),并**本轮自动执行 L1 低风险写**(无需 Notion 凭证):
 - backfill 缺失 frontmatter(id/created_at/updated_at/status)
 - 关键词补链(正文命中其它 Evergreen 标题 → 加 `[[ ]]` + links 字段)
-- 英文高频词补 tags(仅 tags 为空时;中文分词待二期)
+- 按目录路径补主题 tags(仅 tags 为空时;`Concepts/Kunpeng/芯片概念/x.md` → Kunpeng、芯片概念)
 
 每类 L1 操作各自一个 git commit(`gardener(L1): ...`,可整类 revert),受 `batch_l1_max` 截断。最后生成周报:本地 `_System/_Reports/weekly-report.md`(始终)+ Notion 周报队列(若配置,失败降级)。
 

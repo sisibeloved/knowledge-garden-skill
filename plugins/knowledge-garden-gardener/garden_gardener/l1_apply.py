@@ -3,7 +3,7 @@
 三类 L1 操作(对应 config.operations 里的 L1 档):
 - backfill_frontmatter: 补缺失的 id/created_at/updated_at/status
 - add_wikilink:         正文命中其它 Evergreen 标题 → frontmatter links + 正文首处 [[ ]]
-- add_tag:              英文高频词补 tags(仅 tags 为空时;中文分词待二期)
+- add_tag:              按目录路径补主题 tags(仅 tags 为空时;路径即分类信号)
 
 每类操作经 risk.decide 校验(L1 必返 AUTO)、各自一个 git commit(可整类 revert),
 受 batch_l1_max 截断。filesystem 模式下补链退化为关键词(设计 §5.4)。
@@ -19,13 +19,6 @@ from .risk import decide, Decision, Actor
 
 # 正文 [[ ]] 注入上限:单篇最多补这么多链,避免满屏链接
 _MAX_LINKS_PER_NOTE = 5
-# add_tag 的英文停用词(避免把 the/and 当 tag)
-_STOPWORDS = {
-    "the", "and", "for", "with", "that", "this", "from", "are", "was", "were",
-    "will", "can", "not", "but", "you", "all", "any", "has", "have", "had",
-}
-
-
 @dataclass
 class L1Result:
     backfilled: int = 0
@@ -82,7 +75,7 @@ def apply_l1(cfg: Config, vault: Vault, git: Git, *,
         for rel, fm, body in notes[:batch_max]:
             if fm.get("tags"):  # 已有人工/既有 tags → 不覆盖
                 continue
-            tags = _extract_tags(body)
+            tags = _path_tags(rel)
             if tags:
                 fm["tags"] = tags
                 vault.write(rel, dump(fm, body), risk_level="L1")
@@ -247,20 +240,18 @@ def _apply_links(fm: dict, body: str, new_links: list[str]) -> str:
     return body
 
 
-def _extract_tags(body: str, max_tags: int = 3) -> list[str]:
-    """从正文提英文高频词作 tags(长度≥3,至少出现 2 次)。
+def _path_tags(rel: str, max_tags: int = 3) -> list[str]:
+    """目录路径 → 主题 tags(多级分类的结构信号,0.6.2 起替代英文高频词)。
 
-    中文不分词(待二期 A-Mem/分词)。仅 tags 为空时调用(见 apply_l1)。
+    Concepts/Kunpeng/芯片概念/Chip.md → ["Kunpeng", "芯片概念"];
+    Notes/CPython/报告.md → ["CPython"]。首段(Concepts/Notes 类型目录)
+    不算——那是笔记类型不是主题。顶层笔记无目录信号 → 不打 tags。
+    英文高频词方案已废弃:中文库里产出 'gbps'/'shan'/'price' 这类垃圾。
     """
-    words = re.findall(r"[A-Za-z][a-z]{2,}", body)
-    freq: dict[str, int] = {}
-    for w in words:
-        wl = w.lower()
-        if wl in _STOPWORDS:
-            continue
-        freq[wl] = freq.get(wl, 0) + 1
-    ranked = sorted(freq.items(), key=lambda kv: (-kv[1], kv[0]))
-    return [w for w, c in ranked if c >= 2][:max_tags]
+    from pathlib import PurePosixPath
+    parts = [p for p in PurePosixPath(rel).parts[:-1]
+             if p not in ("Concepts", "Notes")]
+    return parts[:max_tags]
 
 
 def _today_iso() -> str:

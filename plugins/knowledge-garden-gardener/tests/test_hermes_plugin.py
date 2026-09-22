@@ -184,7 +184,7 @@ def test_plugin_yaml_exists_and_valid():
     assert p.exists()
     data = yaml.safe_load(p.read_text(encoding="utf-8"))
     assert data["name"] == "garden"
-    assert data["version"] == "0.6.1"
+    assert data["version"] == "0.6.2"
     assert data["kind"] == "standalone"
     assert "windows" in data["platforms"]  # 本机是 Windows,必须支持
     assert "garden_init" in data["provides_tools"]

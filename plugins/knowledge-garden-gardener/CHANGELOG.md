@@ -5,6 +5,20 @@
 格式基于 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/),版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
 
+## [0.6.2] - 2026-09-17
+
+自动打标签策略废弃英文高频词,改用目录路径(园主反馈"错得离谱")。
+
+### Changed
+
+- **`add_tag` 改为按目录路径打主题 tags**:`Concepts/Kunpeng/芯片概念/Chip.md` → `Kunpeng`、`芯片概念`(类型目录 Concepts/Notes 除外,顶层笔记不打)。英文高频词方案在中文库产出 `gbps`/`shan`(TaiShan 被大小写拆开)/`price` 这类垃圾,废弃;`_STOPWORDS` 一并移除。
+
+### Verified
+
+- `pytest tests/ -q` → **148 passed**。
+- 真机:34 篇垃圾 tags 已剥除(revert commit),41 篇按路径重打(Kunpeng 21/芯片概念 11/CPython 10/服务器与集群概念 9/工作 6/面试 3/Ascend 1)。
+
+
 ## [0.6.1] - 2026-09-17
 
 审批队列语义修正:**队列里只放"人批了才有动作"的事**(园主反馈"看不出要审核什么"催生)。
