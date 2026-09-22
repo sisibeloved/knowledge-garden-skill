@@ -5,6 +5,24 @@
 格式基于 [Keep a Changelog 1.1.0](https://keepachangelog.com/zh-CN/1.1.0/),版本号遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
 
+## [0.6.3] - 2026-09-17
+
+手动删除笔记的同步闭环(园主问"手动删了文档如何同步"催生)。
+
+### Added
+
+- **审计断链检测**:fm.links 指向的笔记不存在(被手动删除)→ `AuditReport.broken`,周报新增「断链清单」(`Notes/x.md → [[gone]]`)。存在性按"任意文件名/去扩展名 stem + 任意笔记 title"判定(含 Index/MOC 与 _attachments 图片防误报;表格内别名链接 `[[X\|alias]]` 的尾随 `\` 剥离)。真机首检即揪出 Rack 笔记里一条真实脏数据。
+- **`NotionClient.write_reverted`**:提案作废(status=reverted + review_decision=原因)。
+
+### Fixed
+
+- **apply-approved 崩溃**:批准的 link 提案若目标笔记已被手动删除,`vault.read` 抛 FileNotFoundError 直接炸整个循环。现在 catch 住 → Notion 标 reverted("目标笔记已不存在")→ 计入 `skipped`,继续处理其余提案;CLI 输出 `applied/blocked/skipped` 三计数。
+
+### Verified
+
+- `pytest tests/ -q` → **152 passed**(+4:断链检测/删除后跳过/write_reverted/表格别名链接转义)。
+
+
 ## [0.6.2] - 2026-09-17
 
 自动打标签策略废弃英文高频词,改用目录路径(园主反馈"错得离谱")。

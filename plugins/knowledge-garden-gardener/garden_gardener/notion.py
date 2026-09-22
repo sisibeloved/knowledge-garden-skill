@@ -253,6 +253,18 @@ class NotionClient:
             },
         })
 
+    def write_reverted(self, page_id: str, reason: str) -> None:
+        """提案作废:status=reverted + review_decision=原因。
+
+        典型场景:目标笔记被园主手动删除,批准的提案无从落地。
+        """
+        self._send("PATCH", f"/pages/{page_id}", {
+            "properties": {
+                "status": select_value("reverted"),
+                "review_decision": rich_text_value(reason),
+            },
+        })
+
     def query_projects_activity(self) -> list[dict]:
         """交互③:只读查 Projects 近期状态(供周报)。"""
         resp = self._send("POST", f"/databases/{self.projects_db}/query",

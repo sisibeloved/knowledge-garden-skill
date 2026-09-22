@@ -260,7 +260,8 @@ def main(argv: list[str] | None = None) -> int:
             print("修复 endpoint 后重跑即可。apply-approved 是幂等的:已应用的不会重复。", file=sys.stderr)
             print("=" * 60, file=sys.stderr)
             return 4
-        print(f"applied {len(res.applied)}, blocked {len(res.blocked)}")
+        print(f"applied {len(res.applied)}, blocked {len(res.blocked)}, "
+              f"skipped {len(res.skipped)}")
         return 0
 
     if args.cmd == "review-orphans":

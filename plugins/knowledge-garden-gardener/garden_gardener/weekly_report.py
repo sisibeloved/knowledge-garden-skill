@@ -93,6 +93,7 @@ def _build_markdown(*, week, rep: AuditReport, new_count: int,
     lines += _section("孤岛清单", rep.orphans)
     lines += _section("过时清单", rep.stale)
     lines += _section("Inbox 待处理", rep.inbox_pending)
+    lines += _section("断链清单", [f"{rel} → [[{name}]]" for rel, name in rep.broken])
     lines += ["## 冲突", conflicts_text or "（无）", ""]
     lines += _projects_section(projects_activity)
     return "\n".join(lines)

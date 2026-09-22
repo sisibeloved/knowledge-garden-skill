@@ -1,5 +1,5 @@
 name: garden
-version: 0.6.2
+version: 0.6.3
 description: "知识花园园丁 plugin 的 Hermes 薄包装。把 garden CLI 的 6 个入口(init/weekly-audit/apply-approved/triage-inbox/review-orphans/capture)注册为 Hermes tool 和 hermes garden 子命令,内部 subprocess 调 garden。前置:需先 pip install knowledge-garden-gardener 使 garden 命令可用。"
 author: luchen
 kind: standalone

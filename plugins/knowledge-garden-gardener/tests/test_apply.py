@@ -109,3 +109,32 @@ def test_apply_link_writes_suggested_links(vault, force_filesystem):
     assert "[[RAG]]" in fm.get("links", [])
     assert "[[Retrieval]]" in fm.get("links", [])
     assert "[[RAG]]" in body  # 正文首处也替换
+
+
+def test_apply_skips_when_target_manually_deleted(vault, force_filesystem):
+    """目标笔记被手动删除 → 不崩:提案标 reverted,计入 skipped。"""
+    calls = []
+
+    def fake_send(method, path, json=None):
+        calls.append((method, path, json))
+        if path == "/databases/db-1/query":
+            return {"results": [{
+                "id": "p1",
+                "properties": {"proposal_id": _ttl("010"), "risk": _sel("L2"),
+                               "action": _sel("link"),
+                               "target": _rt("Notes/deleted.md"),
+                               "diff": _rt("建议补链:[[X]]"),
+                               "status": _sel("approved")}}]}
+        return {"id": "p1"}
+
+    client = NotionClient(proposal_db="db-1", projects_db="db-2", send=fake_send)
+    result = apply_approved(_cfg(), Vault(vault), client, Git(vault),
+                            actor="manual_session")
+    assert result.applied == []
+    assert result.skipped == ["p1"]
+    # Notion 侧标了 reverted + 原因
+    patch = [c for c in calls if c[0] == "PATCH" and c[1] == "/pages/p1"]
+    assert patch, "should PATCH the proposal page"
+    props = patch[0][2]["properties"]
+    assert props["status"] == {"select": {"name": "reverted"}}
+    assert "手动删除" in props["review_decision"]["rich_text"][0]["text"]["content"]

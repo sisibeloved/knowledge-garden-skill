@@ -24,6 +24,7 @@ _ACTION_TO_OP = {
 class ApplyResult:
     applied: list[str] = field(default_factory=list)
     blocked: list[str] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)  # 目标笔记已不存在(手动删除)
 
 
 def apply_approved(cfg: Config, vault: Vault, client: NotionClient, git: Git,
@@ -32,6 +33,7 @@ def apply_approved(cfg: Config, vault: Vault, client: NotionClient, git: Git,
     + git commit(带 notion-id)+ 回写 applied_commit。
 
     授权凭证 = Notion status=approved(sanctioned=True)。无凭证/超能力的写硬禁(BLOCKED)。
+    目标笔记已被园主手动删除的 → SKIP:Notion 侧标 reverted(无从落地),不崩。
     """
     res = ApplyResult()
     actor_enum = Actor(actor)
@@ -45,22 +47,29 @@ def apply_approved(cfg: Config, vault: Vault, client: NotionClient, git: Git,
         if d == Decision.BLOCKED:
             res.blocked.append(item["id"])
             continue
-        # 执行写入:create → 写 diff 全文;link → 把 diff 里的建议 [[ ]] 落进笔记
+        # 执行写入(create → 写 diff 全文;link → 把 diff 里的建议 [[ ]] 落进笔记)
         target = props.get("target", "")
-        if action == "create":
-            fm = {
-                "id": props.get("proposal_id"),
-                "type": "concept",
-                "title": target,
-                "status": "evergreen",
-                "sources": [s for s in (props.get("sources", "") or "").split(",") if s],
-                "confidence": props.get("confidence", 0.5),
-            }
-            vault.write(target, dump(fm, props.get("diff", "")), risk_level="L2")
-        elif action == "link":
-            suggested = re.findall(r"\[\[([^\]|#]+?)\]\]",
-                                   props.get("diff", "") or "")
-            apply_wikilinks(vault, target, [s.strip() for s in suggested])
+        try:
+            if action == "create":
+                fm = {
+                    "id": props.get("proposal_id"),
+                    "type": "concept",
+                    "title": target,
+                    "status": "evergreen",
+                    "sources": [s for s in (props.get("sources", "") or "").split(",") if s],
+                    "confidence": props.get("confidence", 0.5),
+                }
+                vault.write(target, dump(fm, props.get("diff", "")), risk_level="L2")
+            elif action == "link":
+                suggested = re.findall(r"\[\[([^\]|#]+?)\]\]",
+                                       props.get("diff", "") or "")
+                apply_wikilinks(vault, target, [s.strip() for s in suggested])
+        except FileNotFoundError:
+            # 园主已手动删除目标笔记 → 提案无从落地,标 reverted 并跳过
+            client.write_reverted(item["id"],
+                                  "目标笔记已不存在(手动删除),提案作废")
+            res.skipped.append(item["id"])
+            continue
         sha = git.commit_all(
             cfg.risk_of(op), f"{action} {target}",
             notion_id=props.get("proposal_id"),

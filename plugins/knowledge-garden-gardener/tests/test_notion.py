@@ -316,3 +316,18 @@ def test_token_resolved_from_env(monkeypatch):
     # 显式 token 优先于环境变量
     c2 = NotionClient(token="ntn-explicit", token_env="MY_NOTION_TOKEN")
     assert c2.token == "ntn-explicit"
+
+
+def test_write_reverted_patches_status_and_reason():
+    calls = []
+
+    def fake_send(method, path, json=None):
+        calls.append((method, path, json))
+        return {"id": "p1"}
+
+    client = _mkclient(send=fake_send)
+    client.write_reverted("p1", "目标笔记已不存在")
+    assert calls[0][0] == "PATCH"
+    props = calls[0][2]["properties"]
+    assert props["status"] == {"select": {"name": "reverted"}}
+    assert props["review_decision"]["rich_text"][0]["text"]["content"] == "目标笔记已不存在"

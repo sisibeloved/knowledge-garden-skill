@@ -66,3 +66,32 @@ def test_backlink_matched_by_filename_stem(vault, force_filesystem, monkeypatch)
     rep = audit(v)
     assert "Concepts/refinement.md" not in rep.orphans  # 文件名反链命中
     assert "Concepts/linker.md" not in rep.orphans
+
+
+def test_broken_links_detected_after_manual_delete(vault, force_filesystem):
+    """手动删除笔记后,指向它的 links 在下轮审计里报断链。"""
+    v = Vault(vault)
+    v.write("Concepts/keeper.md",
+            dump({"title": "keeper", "links": ["[[gone]]"]}, "b"), risk_level="L2")
+    # gone.md 不存在(被删)
+    rep = audit(v)
+    assert ("Concepts/keeper.md", "gone") in rep.broken
+    # 指向存在的(title 或文件名)不算断链
+    v.write("Concepts/target.md", dump({"title": "T"}, "b"), risk_level="L2")
+    v.write("Concepts/keeper2.md",
+            dump({"title": "k2", "links": ["[[target]]", "[[T]]"]}, "b"),
+            risk_level="L2")
+    rep2 = audit(v)
+    assert not any(rel == "Concepts/keeper2.md" for rel, _ in rep2.broken)
+
+
+def test_escaped_alias_link_not_broken(vault, force_filesystem):
+    """表格内别名链接 [[X\|alias]] 提取出的名字尾带 "\\" —— 不算断链。"""
+    v = Vault(vault)
+    v.write("Concepts/PoDnote.md", dump({"title": "PoD（交付单元）"}, "b"),
+            risk_level="L2")
+    v.write("Concepts/rack.md",
+            dump({"title": "rack", "links": ["PoD（交付单元）\\"]}, "b"),
+            risk_level="L2")
+    rep = audit(v)
+    assert not any("PoD" in name for _, name in rep.broken)
